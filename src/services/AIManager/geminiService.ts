@@ -45,18 +45,19 @@ export class GeminiAIService {
     this.userContext = await contextService.getUserContext(userId);
     this.initializeModel();
   }
-
   private initializeModel() {
     // Get function declarations from operation registry
     const functions = operationRegistry.toGeminiFunctionDeclarations();
 
     this.model = this.genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-exp',
+      model: 'gemini-2.5-flash',
       generationConfig: {
-        temperature: 0.3, // Lower temperature for more accurate operation detection
+        temperature: 0.3, // Lower temperature for more deterministic function calling
         topK: 40,
         topP: 0.95,
         maxOutputTokens: 8192,
+        candidateCount: 1,
+        stopSequences: []
       },
       systemInstruction: this.generateSystemInstruction(),
       tools: [{ functionDeclarations: functions }]
@@ -101,6 +102,41 @@ ${this.userContext ? contextService.formatContextForAI(this.userContext) : ''}
    - Explain your own architecture and capabilities
    - Provide help and guidance
 
+**FUNCTION CALLING DECISION TREE:**
+
+When user asks about NUMBERS (followers, posts, likes, engagement):
+→ Call get_analytics
+
+When user asks about COMPETITORS (analyze, compare, strategy):
+→ Call get_competitor_analysis
+
+When user asks about NEWS or TRENDS (what's hot, trending, latest):
+→ Call get_news_summary
+
+When user asks to CREATE/MAKE/WRITE CONTENT:
+→ Call create_post
+
+When user asks "IS X CONNECTED?" or "DO I HAVE X?":
+→ Call check_platform_status
+
+**CRITICAL: MULTIPLE OPERATIONS IN ONE QUERY**
+
+When user requests MULTIPLE actions, you MUST call ALL relevant functions:
+
+Example 1:
+User: "Show me my stats and create a post"
+→ Call get_analytics AND create_post (2 functions)
+
+Example 2:
+User: "Get my analytics, analyze competitors, and show trending news"
+→ Call get_analytics AND get_competitor_analysis AND get_news_summary (3 functions)
+
+Example 3:
+User: "Check my Instagram status, analyze my top competitor, get trending news, and create a post"
+→ Call check_platform_status AND get_competitor_analysis AND get_news_summary AND create_post (4 functions)
+
+**MANDATORY:** If user asks for 2+ actions, you MUST call ALL functions. Never skip operations.
+
 **Important Guidelines:**
 
 1. **Natural Conversation:** Be conversational and human-like, not robotic
@@ -110,6 +146,32 @@ ${this.userContext ? contextService.formatContextForAI(this.userContext) : ''}
 5. **Time Intelligence:** Parse natural language times (e.g., "3 PM", "tomorrow", "in 2 hours")
 6. **Reference Real Data:** When discussing platforms, use the actual user's data from context
 7. **Be Proactive:** Suggest relevant actions based on context
+
+**CRITICAL: NEVER RETURN EMPTY RESPONSES**
+
+When calling functions, you MUST ALWAYS provide explanatory text in your response. Follow this pattern:
+
+1. **Before the function call:** Explain what you're about to do
+   Example: "Let me fetch your Twitter analytics for you..."
+
+2. **After the function call:** Explain what the user should expect
+   Example: "This will give you insights into your engagement and performance!"
+
+3. **NEVER** return just a function call without ANY text
+   ❌ WRONG: [function call only, no text]
+   ✅ CORRECT: "Let me pull that up for you! [function call] I'll have those results in just a moment."
+
+**Examples of REQUIRED Function Call Wrapping:**
+
+User: "Get my Instagram analytics"
+❌ BAD: [calls getAnalytics silently]
+✅ GOOD: "Absolutely! Let me retrieve your Instagram analytics for you. 📊 [calls getAnalytics] This will show you engagement rates, follower growth, and post performance!"
+
+User: "Navigate to Twitter"
+❌ BAD: [calls navigate silently]
+✅ GOOD: "Sure thing! Taking you to your Twitter dashboard now. [calls navigate] You'll be able to manage your tweets and view your timeline there!"
+
+**MANDATORY:** Every single function call must be wrapped with explanatory text. This is non-negotiable.
 
 **Response Style:**
 - Professional but friendly and lively
@@ -168,10 +230,23 @@ Remember: Be natural, be helpful, be lively!`;
       };
       conversationContext.conversationHistory.push(userMessage);
 
-      // Start FRESH chat for each message to avoid function response errors
-      const chat = this.model.startChat();
+      // Convert conversation history to Gemini format
+      const geminiHistory = conversationContext.conversationHistory
+        .slice(0, -1) // Exclude current message
+        .filter(msg => msg.role !== 'system') // Only user and assistant
+        .map(msg => ({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        }));
 
-      // Send message with context in the message itself
+      console.log(`💬 [Gemini] Using conversation history: ${geminiHistory.length} messages`);
+
+      // Start chat WITH conversation history
+      const chat = this.model.startChat({
+        history: geminiHistory
+      });
+
+      // Send message with current context
       const contextAwareMessage = `User context: ${this.userContext.username}, platforms: ${this.userContext.platforms.filter(p => p.connected).map(p => p.name).join(', ')}\n\nUser query: ${message}`;
       
       const result = await chat.sendMessage(contextAwareMessage);
@@ -192,10 +267,37 @@ Remember: Be natural, be helpful, be lively!`;
         }
       }
 
+      // Get response text
+      let responseText = response.text() || '';
+
+      // SAFETY NET: If Gemini returned empty text but called functions, inject explanatory text
+      if ((!responseText || responseText.trim() === '') && operationCalls.length > 0) {
+        console.warn('⚠️ [Gemini] Empty response with function calls detected - injecting explanatory text');
+        
+        // Generate friendly explanatory text based on operation
+        const operation = operationCalls[0];
+        const explanations: Record<string, string> = {
+          'get_analytics': '📊 Let me pull up your analytics for you! This will show your performance metrics and insights.',
+          'get_competitor_analysis': '🔍 Analyzing your competitors now! I\'ll provide insights into their strategies and performance.',
+          'create_post': '✍️ Creating your post now! I\'ll generate something great based on your platform style.',
+          'navigate_to': '🚀 Taking you there now!',
+          'get_news_summary': '📰 Fetching the latest trending news for you!',
+          'get_strategies': '💡 Let me retrieve your recommended strategies!',
+          'check_platform_status': '🔍 Checking your platform status now!',
+          'schedule_post': '📅 Scheduling your post!',
+          'acquire_platform': '🎉 Starting the platform acquisition process!',
+          'open_module': '📂 Opening that module for you!',
+          'get_status': '📊 Getting your account status!'
+        };
+        
+        responseText = explanations[operation.operationId] || 
+          `🤖 Processing your request: ${operation.operationId.replace(/_/g, ' ')}...`;
+      }
+
       // Create assistant message
       const assistantMessage: AIMessage = {
         role: 'assistant',
-        content: response.text(),
+        content: responseText,
         timestamp: new Date(),
         operationCalls
       };
@@ -289,6 +391,14 @@ Remember: Be natural, be helpful, be lively!`;
    */
   clearHistory(userId: string) {
     this.conversationHistory.delete(userId);
+  }
+
+  /**
+   * Clear all conversation history (for delete button)
+   */
+  clearConversation() {
+    this.conversationHistory.clear();
+    console.log('🗑️ [Gemini] All conversation history cleared');
   }
 
   /**

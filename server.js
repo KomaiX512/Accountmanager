@@ -21,6 +21,7 @@ try {
 import * as net from 'net';
 import { exec } from 'child_process';
 import os from 'os';
+import * as aiManagerOps from './server/ai-manager-operations.js';
 
 // Add at the top of the file
 const DEBUG_LOGS = process.env.DEBUG_LOGS === 'true';
@@ -3420,6 +3421,281 @@ const PRICING_PLANS = {
 // ============================================================
 // END USER MANAGEMENT & PROTECTION LAYER API
 // ============================================================
+
+// ============================================================
+// PROFILE INFO API - Read cached profile data including competitors
+// ============================================================
+
+app.get('/api/profile-info/:username', async (req, res) => {
+  const { username } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Fetching profile for ${username} on ${platform}`);
+    
+    // Read cached profile file from data/cache/
+    const profileFilePath = path.join(__dirname, 'data', 'cache', `${platform}_${username}_profile.json`);
+    
+    // Check if file exists
+    if (!fs.existsSync(profileFilePath)) {
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile file not found: ${profileFilePath}`);
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: `No cached profile data for ${username} on ${platform}`
+      });
+    }
+    
+    // Read and parse profile file
+    const profileData = JSON.parse(fs.readFileSync(profileFilePath, 'utf-8'));
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile loaded successfully`);
+    
+    // Extract data structure (handle both direct and nested data)
+    let profileInfo = profileData.data ? profileData.data[0] : profileData;
+    
+    // Build response with competitor data
+    const response = {
+      username: profileInfo.username || username,
+      fullName: profileInfo.fullName || profileInfo.full_name || '',
+      biography: profileInfo.biography || profileInfo.bio || '',
+      followersCount: profileInfo.followersCount || profileInfo.followers || profileInfo.follower_count || 0,
+      followingCount: profileInfo.followsCount || profileInfo.following || profileInfo.following_count || 0,
+      postsCount: profileInfo.postsCount || profileInfo.posts_count || 0,
+      verified: profileInfo.verified || false,
+      profilePicUrl: profileInfo.profilePicUrl || profileInfo.profile_pic_url || '',
+      externalUrl: profileInfo.externalUrl || profileInfo.external_url || '',
+      isBusinessAccount: profileInfo.isBusinessAccount || profileInfo.is_business_account || false,
+      
+      // Posts data
+      posts: profileInfo.latestPosts || profileInfo.posts || [],
+      
+      // Competitor data (from relatedProfiles)
+      competitors: []
+    };
+    
+    // Extract competitor data from relatedProfiles
+    if (profileInfo.relatedProfiles && Array.isArray(profileInfo.relatedProfiles)) {
+      response.competitors = profileInfo.relatedProfiles.map(comp => ({
+        username: comp.username || comp.name || '',
+        fullName: comp.fullName || comp.full_name || '',
+        followersCount: comp.followersCount || comp.followers || comp.follower_count || 0,
+        postsCount: comp.postsCount || comp.posts_count || 0,
+        verified: comp.verified || false,
+        profilePicUrl: comp.profilePicUrl || comp.profile_pic_url || '',
+        isBusinessAccount: comp.isBusinessAccount || comp.is_business_account || false
+      }));
+      
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Found ${response.competitors.length} competitors`);
+    }
+    
+    res.json(response);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [API-PROFILE-INFO] Error:`, error);
+    res.status(500).json({
+      error: 'Failed to load profile',
+      message: error.message
+    });
+  }
+});
+
+// LinkedIn-specific profile info route
+app.get('/api/profile-info/:platform/:username', async (req, res) => {
+  const { platform, username } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Fetching ${platform} profile for ${username}`);
+    
+    // Read cached profile file from data/cache/
+    const profileFilePath = path.join(__dirname, 'data', 'cache', `${platform}_${username}_profile.json`);
+    
+    // Check if file exists
+    if (!fs.existsSync(profileFilePath)) {
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile file not found: ${profileFilePath}`);
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: `No cached profile data for ${username} on ${platform}`
+      });
+    }
+    
+    // Read and parse profile file
+    const profileData = JSON.parse(fs.readFileSync(profileFilePath, 'utf-8'));
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile loaded successfully`);
+    
+    // Extract data structure (handle both direct and nested data)
+    let profileInfo = profileData.data ? profileData.data[0] : profileData;
+    
+    // Build response
+    const response = {
+      username: profileInfo.username || username,
+      fullName: profileInfo.fullName || profileInfo.full_name || '',
+      biography: profileInfo.biography || profileInfo.bio || '',
+      followersCount: profileInfo.followersCount || profileInfo.followers || profileInfo.follower_count || 0,
+      followingCount: profileInfo.followsCount || profileInfo.following || profileInfo.following_count || 0,
+      postsCount: profileInfo.postsCount || profileInfo.posts_count || 0,
+      verified: profileInfo.verified || false,
+      profilePicUrl: profileInfo.profilePicUrl || profileInfo.profile_pic_url || '',
+      externalUrl: profileInfo.externalUrl || profileInfo.external_url || '',
+      isBusinessAccount: profileInfo.isBusinessAccount || profileInfo.is_business_account || false,
+      posts: profileInfo.latestPosts || profileInfo.posts || [],
+      competitors: []
+    };
+    
+    // Extract competitor data
+    if (profileInfo.relatedProfiles && Array.isArray(profileInfo.relatedProfiles)) {
+      response.competitors = profileInfo.relatedProfiles.map(comp => ({
+        username: comp.username || comp.name || '',
+        fullName: comp.fullName || comp.full_name || '',
+        followersCount: comp.followersCount || comp.followers || comp.follower_count || 0,
+        postsCount: comp.postsCount || comp.posts_count || 0,
+        verified: comp.verified || false,
+        profilePicUrl: comp.profilePicUrl || comp.profile_pic_url || '',
+        isBusinessAccount: comp.isBusinessAccount || comp.is_business_account || false
+      }));
+    }
+    
+    res.json(response);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [API-PROFILE-INFO] Error:`, error);
+    res.status(500).json({
+      error: 'Failed to load profile',
+      message: error.message
+    });
+  }
+});
+
+// ============================================================================
+// AI MANAGER AGENTIC OPERATIONS
+// ============================================================================
+
+// Initialize S3 client for AI Manager operations
+aiManagerOps.initializeS3Client(s3Client);
+
+/**
+ * AI Manager: Analyze Specific Competitor
+ * Shows real-time progress of file reading and AI analysis
+ */
+app.post('/api/ai-manager/analyze-competitor', async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    const { userId, platform, competitorUsername } = req.body;
+    
+    if (!userId || !platform || !competitorUsername) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: userId, platform, competitorUsername'
+      });
+    }
+    
+    console.log(`[AI-Manager API] Analyzing competitor: ${competitorUsername} on ${platform} for user ${userId}`);
+    
+    // Progress callback to track operations
+    const progressUpdates = [];
+    const progressCallback = (message) => {
+      console.log(`[AI-Manager Progress] ${message}`);
+      progressUpdates.push(message);
+    };
+    
+    const result = await aiManagerOps.analyzeCompetitor(
+      userId,
+      platform,
+      competitorUsername,
+      progressCallback
+    );
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('[AI-Manager API] Competitor analysis error:', error);
+    res.status(500).json({
+      success: false,
+      message: `Server error: ${error.message}`
+    });
+  }
+});
+
+/**
+ * AI Manager: Get Overall Competitor Analysis
+ * Reads your profile and all competitor profiles from disk
+ */
+app.post('/api/ai-manager/competitor-analysis', async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    const { userId, platform } = req.body;
+    
+    if (!userId || !platform) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: userId, platform'
+      });
+    }
+    
+    console.log(`[AI-Manager API] Getting competitive analysis for ${platform} user ${userId}`);
+    
+    const progressUpdates = [];
+    const progressCallback = (message) => {
+      console.log(`[AI-Manager Progress] ${message}`);
+      progressUpdates.push(message);
+    };
+    
+    const result = await aiManagerOps.getCompetitorAnalysis(
+      userId,
+      platform,
+      progressCallback
+    );
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('[AI-Manager API] Competitive analysis error:', error);
+    res.status(500).json({
+      success: false,
+      message: `Server error: ${error.message}`
+    });
+  }
+});
+
+/**
+ * AI Manager: Get AI-Powered News Summary
+ * Reads news from R2 and generates intelligent summary with Gemini
+ */
+app.post('/api/ai-manager/news-summary', async (req, res) => {
+  setCorsHeaders(res);
+  
+  try {
+    const { userId, platform } = req.body;
+    
+    if (!userId || !platform) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: userId, platform'
+      });
+    }
+    
+    console.log(`[AI-Manager API] Getting news summary for ${platform} user ${userId}`);
+    
+    const progressUpdates = [];
+    const progressCallback = (message) => {
+      console.log(`[AI-Manager Progress] ${message}`);
+      progressUpdates.push(message);
+    };
+    
+    const result = await aiManagerOps.getNewsSummary(
+      userId,
+      platform,
+      progressCallback
+    );
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('[AI-Manager API] News summary error:', error);
+    res.status(500).json({
+      success: false,
+      message: `Server error: ${error.message}`
+    });
+  }
+});
 
 // Enterprise-grade server startup with port conflict resolution
 const startServer = async () => {

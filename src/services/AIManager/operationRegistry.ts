@@ -98,7 +98,7 @@ export const ACQUIRE_PLATFORM: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: false,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     // Implementation will call the actual platform acquisition API
     return {
       success: true,
@@ -116,7 +116,7 @@ export const ACQUIRE_PLATFORM: OperationDefinition = {
 export const CHECK_PLATFORM_STATUS: OperationDefinition = {
   id: 'check_platform_status',
   name: 'Check Platform Status',
-  description: 'Check the connection and processing status of a platform',
+  description: 'Check ONLY if platform is connected. Use ONLY when user explicitly asks is X connected, do I have X, am I connected to X, or what platforms do I have. DO NOT use for analytics, stats, or any numerical data.',
   category: 'platform',
   parameters: [
     {
@@ -129,7 +129,7 @@ export const CHECK_PLATFORM_STATUS: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: false,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Checking status for ${params.platform}...`,
@@ -145,7 +145,7 @@ export const CHECK_PLATFORM_STATUS: OperationDefinition = {
 export const CREATE_POST: OperationDefinition = {
   id: 'create_post',
   name: 'Create Post',
-  description: 'Create a social media post with AI assistance',
+  description: 'Create a new post with AI. Use when user asks to create, make, write, generate, or post content. This actually creates and generates social media content with captions and optionally images.',
   category: 'content',
   parameters: [
     {
@@ -158,8 +158,9 @@ export const CREATE_POST: OperationDefinition = {
     {
       name: 'prompt',
       type: 'string',
-      description: 'What the post should be about',
-      required: true
+      description: 'What the post should be about (optional - if not provided, will create general engaging content)',
+      required: false,
+      default: 'Create an engaging post about recent trends'
     },
     {
       name: 'includeImage',
@@ -179,7 +180,7 @@ export const CREATE_POST: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: true,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Creating ${params.platform} post about: ${params.prompt}`,
@@ -217,7 +218,7 @@ export const CREATE_POST_FROM_NEWS: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: true,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Creating post from news item #${params.newsIndex} for ${params.platform}`,
@@ -254,7 +255,7 @@ export const SCHEDULE_POST: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: true,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Post scheduled for ${params.scheduledTime}`,
@@ -293,7 +294,7 @@ export const AUTO_SCHEDULE_POSTS: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: true,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Auto-scheduling ${params.numberOfPosts} posts with ${params.intervalHours}h intervals`,
@@ -309,7 +310,7 @@ export const AUTO_SCHEDULE_POSTS: OperationDefinition = {
 export const GET_ANALYTICS: OperationDefinition = {
   id: 'get_analytics',
   name: 'Get Analytics',
-  description: 'Retrieve analytics and performance metrics',
+  description: 'Get NUMBERS: follower count, post count, engagement rate, likes, comments, reach. Use this when user asks for stats, metrics, analytics, or any numerical data about their account performance.',
   category: 'analytics',
   parameters: [
     {
@@ -337,7 +338,7 @@ export const GET_ANALYTICS: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: false,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Retrieving ${params.metric || 'all'} analytics for ${params.platform}`,
@@ -349,7 +350,7 @@ export const GET_ANALYTICS: OperationDefinition = {
 export const GET_COMPETITOR_ANALYSIS: OperationDefinition = {
   id: 'get_competitor_analysis',
   name: 'Get Competitor Analysis',
-  description: 'Analyze competitor performance and strategies',
+  description: 'Analyze competitors with AI-powered insights, strategies, and recommendations. Use when user asks about competitors, competition, comparing to other accounts, or wants strategic advice. Returns detailed analysis with actionable insights, NOT just numbers.',
   category: 'analytics',
   parameters: [
     {
@@ -372,11 +373,100 @@ export const GET_COMPETITOR_ANALYSIS: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: true,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Analyzing competitors on ${params.platform}`,
       data: { analysis: {} }
+    };
+  }
+};
+
+export const GET_STATUS: OperationDefinition = {
+  id: 'get_status',
+  name: 'Get Status',
+  description: 'Get overview of connected platforms with follower counts, post counts, and connection status',
+  category: 'analytics',
+  parameters: [
+    {
+      name: 'platform',
+      type: 'string',
+      description: 'Specific platform to check (optional, defaults to all connected platforms)',
+      required: false,
+      enum: ['instagram', 'twitter', 'facebook', 'linkedin']
+    }
+  ],
+  requiresAuth: true,
+  requiresPlatform: false,
+  execute: async (_params, _context) => {
+    return {
+      success: true,
+      message: 'Getting your status...',
+      data: {}
+    };
+  }
+};
+
+export const GET_NEWS_SUMMARY: OperationDefinition = {
+  id: 'get_news_summary',
+  name: 'Get News Summary',
+  description: 'Get trending news with AI summary. Use when user asks about trending topics, what is hot, latest news, what is happening, or current trends on the platform.',
+  category: 'analytics',
+  parameters: [
+    {
+      name: 'platform',
+      type: 'string',
+      description: 'Platform to get trending news for',
+      required: true,
+      enum: ['instagram', 'twitter', 'facebook', 'linkedin']
+    },
+    {
+      name: 'limit',
+      type: 'number',
+      description: 'Number of news items to display',
+      required: false,
+      default: 4
+    }
+  ],
+  requiresAuth: true,
+  requiresPlatform: true,
+  execute: async (_params, _context) => {
+    return {
+      success: true,
+      message: 'Fetching trending news...',
+      data: {}
+    };
+  }
+};
+
+export const GET_STRATEGIES: OperationDefinition = {
+  id: 'get_strategies',
+  name: 'Get Strategies',
+  description: 'Retrieve recommended strategies and action items for a platform',
+  category: 'analytics',
+  parameters: [
+    {
+      name: 'platform',
+      type: 'string',
+      description: 'Platform to get strategies for',
+      required: true,
+      enum: ['instagram', 'twitter', 'facebook', 'linkedin']
+    },
+    {
+      name: 'limit',
+      type: 'number',
+      description: 'Number of strategies to display',
+      required: false,
+      default: 5
+    }
+  ],
+  requiresAuth: true,
+  requiresPlatform: true,
+  execute: async (_params, _context) => {
+    return {
+      success: true,
+      message: 'Fetching strategies...',
+      data: {}
     };
   }
 };
@@ -402,22 +492,12 @@ export const NAVIGATE_TO: OperationDefinition = {
         'twitter', 
         'facebook', 
         'linkedin', 
-        'usage', 
-        'admin', 
-        'settings', 
         'pricing',
         'home',
         'homepage',
         'privacy',
-        'privacy-policy',
-        'terms',
-        'terms-of-service',
-        'about',
-        'contact',
-        'help',
-        'support',
         'login',
-        'signup'
+        'admin'
       ]
     },
     {
@@ -429,7 +509,7 @@ export const NAVIGATE_TO: OperationDefinition = {
   ],
   requiresAuth: false,
   requiresPlatform: false,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Navigating to ${params.destination}`,
@@ -461,7 +541,7 @@ export const OPEN_MODULE: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: false,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Opening ${params.module} module`,
@@ -502,7 +582,7 @@ export const UPDATE_SETTINGS: OperationDefinition = {
   ],
   requiresAuth: true,
   requiresPlatform: false,
-  execute: async (params, context) => {
+  execute: async (params, _context) => {
     return {
       success: true,
       message: `Updated ${params.setting} to ${params.value}`,
@@ -535,6 +615,9 @@ export class OperationRegistry {
     // Analytics operations
     this.register(GET_ANALYTICS);
     this.register(GET_COMPETITOR_ANALYSIS);
+    this.register(GET_STATUS);
+    this.register(GET_NEWS_SUMMARY);
+    this.register(GET_STRATEGIES);
 
     // Navigation operations
     this.register(NAVIGATE_TO);

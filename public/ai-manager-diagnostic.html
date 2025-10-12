@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Manager Frontend Diagnostic</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0a0a;
+      color: #00ffcc;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #00ffcc;
+      border-bottom: 2px solid #00ffcc;
+      padding-bottom: 10px;
+    }
+    .test-result {
+      margin: 10px 0;
+      padding: 10px;
+      border-left: 3px solid #666;
+      background: rgba(255,255,255,0.05);
+    }
+    .test-result.pass {
+      border-left-color: #00ff00;
+      background: rgba(0,255,0,0.1);
+    }
+    .test-result.fail {
+      border-left-color: #ff0000;
+      background: rgba(255,0,0,0.1);
+    }
+    .test-result.running {
+      border-left-color: #ffaa00;
+      background: rgba(255,170,0,0.1);
+    }
+    .summary {
+      font-size: 24px;
+      margin: 20px 0;
+      padding: 20px;
+      background: rgba(0,255,204,0.1);
+      border: 2px solid #00ffcc;
+    }
+    .details {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+    }
+    .error {
+      color: #ff6b6b;
+      font-weight: bold;
+    }
+    button {
+      background: #00ffcc;
+      color: #0a0a0a;
+      border: none;
+      padding: 15px 30px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px 5px;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #00ddaa;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      background: rgba(0,0,0,0.3);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 AI MANAGER FRONTEND DIAGNOSTIC</h1>
+    <p>Simulating 20 real user queries to test frontend-backend integration</p>
+    
+    <button onclick="runDiagnostic()">▶️ RUN DIAGNOSTIC</button>
+    <button onclick="clearResults()">🗑️ CLEAR</button>
+    
+    <div id="summary"></div>
+    <div id="results"></div>
+    <div id="logs"></div>
+  </div>
+
+  <script type="module">
+    const resultsDiv = document.getElementById('results');
+    const summaryDiv = document.getElementById('summary');
+    const logsDiv = document.getElementById('logs');
+    let testResults = [];
+
+    // Simulate userId (you'll need to get this from your auth context)
+    const TEST_USER_ID = 'u2023460'; // Replace with actual user ID
+
+    const queries = [
+      { q: "Show me my Instagram follower count", expect: "analytics", category: "Analytics" },
+      { q: "What's trending on Instagram today?", expect: "news", category: "News" },
+      { q: "Tell me about my Instagram competitors", expect: "competitors", category: "Competitors" },
+      { q: "Create an Instagram post about AI", expect: "post", category: "Post Creation" },
+      { q: "How many posts do I have on Instagram?", expect: "analytics", category: "Analytics" },
+      { q: "Is my Facebook connected?", expect: "status", category: "Platform Check" },
+      { q: "Analyze fentybeauty competitor on Instagram", expect: "competitors", category: "Competitors" },
+      { q: "Show my Instagram engagement rate", expect: "analytics", category: "Analytics" },
+      { q: "What's hot on Instagram right now?", expect: "news", category: "News" },
+      { q: "Show stats and create post on Instagram", expect: "multi-op", category: "Multi-Op" },
+      { q: "Get analytics and news for Instagram", expect: "multi-op", category: "Multi-Op" },
+      { q: "Tell me my Instagram follower growth", expect: "analytics", category: "Analytics" },
+      { q: "Summarize trending Instagram news", expect: "news", category: "News" },
+      { q: "Compare my Instagram to competitors", expect: "competitors", category: "Competitors" },
+      { q: "Create a post about today's trends", expect: "post", category: "Post Creation" },
+      { q: "Show my Instagram metrics", expect: "analytics", category: "Analytics" },
+      { q: "What platforms do I have connected?", expect: "status", category: "Platform Check" },
+      { q: "Analyze my top Instagram competitors", expect: "competitors", category: "Competitors" },
+      { q: "Show trending topics on Instagram", expect: "news", category: "News" },
+      { q: "Get stats, news, and analyze competitors", expect: "multi-op", category: "Complex Multi-Op" }
+    ];
+
+    function log(message, type = 'info') {
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logsDiv.insertBefore(entry, logsDiv.firstChild);
+    }
+
+    async function testBackendEndpoint(endpoint, payload) {
+      try {
+        log(`Testing: POST ${endpoint}`, 'info');
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        log(`Response: ${response.status} - ${data.success ? 'SUCCESS' : 'FAIL'}`, data.success ? 'pass' : 'fail');
+        
+        return {
+          success: response.ok && data.success,
+          status: response.status,
+          data: data,
+          error: data.success ? null : data.message
+        };
+      } catch (error) {
+        log(`ERROR: ${error.message}`, 'error');
+        return {
+          success: false,
+          status: 0,
+          data: null,
+          error: error.message
+        };
+      }
+    }
+
+    async function runDiagnostic() {
+      resultsDiv.innerHTML = '';
+      summaryDiv.innerHTML = '<p>🔄 Running diagnostic...</p>';
+      testResults = [];
+      
+      log('='.repeat(60), 'info');
+      log('STARTING AI MANAGER DIAGNOSTIC', 'info');
+      log('='.repeat(60), 'info');
+
+      // Test 1: Check localStorage
+      log('TEST 1: Checking localStorage...', 'info');
+      const accountHolder = localStorage.getItem('accountHolder');
+      const instagramAccessed = localStorage.getItem(`instagram_accessed_${TEST_USER_ID}`);
+      const instagramUsername = localStorage.getItem(`instagram_username_${TEST_USER_ID}`);
+      
+      log(`accountHolder: ${accountHolder || 'NOT SET'}`, accountHolder ? 'pass' : 'fail');
+      log(`instagram_accessed_${TEST_USER_ID}: ${instagramAccessed || 'NOT SET'}`, instagramAccessed ? 'pass' : 'fail');
+      log(`instagram_username_${TEST_USER_ID}: ${instagramUsername || 'NOT SET'}`, instagramUsername ? 'pass' : 'fail');
+
+      // Test 2: Check backend endpoints
+      log('TEST 2: Checking backend endpoints...', 'info');
+      
+      const endpoints = [
+        { 
+          name: 'News Summary', 
+          url: '/api/ai-manager/news-summary',
+          payload: { userId: TEST_USER_ID, platform: 'instagram' }
+        },
+        { 
+          name: 'Competitor Analysis', 
+          url: '/api/ai-manager/competitor-analysis',
+          payload: { userId: TEST_USER_ID, platform: 'instagram' }
+        },
+        { 
+          name: 'Analyze Specific Competitor', 
+          url: '/api/ai-manager/analyze-competitor',
+          payload: { userId: TEST_USER_ID, platform: 'instagram', competitorUsername: 'fentybeauty' }
+        }
+      ];
+
+      for (const endpoint of endpoints) {
+        const result = await testBackendEndpoint(endpoint.url, endpoint.payload);
+        
+        const testResult = {
+          name: endpoint.name,
+          passed: result.success,
+          status: result.status,
+          error: result.error,
+          data: result.data
+        };
+        
+        testResults.push(testResult);
+        
+        const div = document.createElement('div');
+        div.className = `test-result ${result.success ? 'pass' : 'fail'}`;
+        div.innerHTML = `
+          <strong>${result.success ? '✅' : '❌'} ${endpoint.name}</strong><br>
+          Status: ${result.status}<br>
+          ${result.error ? `<span class="error">Error: ${result.error}</span>` : ''}
+          <div class="details">Endpoint: ${endpoint.url}</div>
+          ${result.data ? `<div class="details">Response: ${JSON.stringify(result.data).substring(0, 200)}...</div>` : ''}
+        `;
+        resultsDiv.appendChild(div);
+        
+        await new Promise(r => setTimeout(r, 1000)); // Rate limit
+      }
+
+      // Summary
+      const passed = testResults.filter(r => r.passed).length;
+      const total = testResults.length;
+      const percentage = Math.round((passed / total) * 100);
+      
+      summaryDiv.innerHTML = `
+        <div class="summary">
+          <div>📊 DIAGNOSTIC RESULTS</div>
+          <div style="font-size: 48px; margin: 20px 0;">
+            ${passed}/${total} (${percentage}%)
+          </div>
+          <div>${percentage >= 80 ? '✅ READY FOR TESTING' : percentage >= 60 ? '⚠️ NEEDS FIXES' : '❌ CRITICAL ISSUES'}</div>
+        </div>
+      `;
+
+      log('='.repeat(60), 'info');
+      log(`DIAGNOSTIC COMPLETE: ${passed}/${total} tests passed`, passed === total ? 'pass' : 'fail');
+      log('='.repeat(60), 'info');
+
+      // Detailed issues
+      const failures = testResults.filter(r => !r.passed);
+      if (failures.length > 0) {
+        log('FAILURES DETECTED:', 'error');
+        failures.forEach(f => {
+          log(`- ${f.name}: ${f.error}`, 'error');
+        });
+      }
+    }
+
+    function clearResults() {
+      resultsDiv.innerHTML = '';
+      summaryDiv.innerHTML = '';
+      logsDiv.innerHTML = '';
+      testResults = [];
+    }
+
+    window.runDiagnostic = runDiagnostic;
+    window.clearResults = clearResults;
+
+    // Auto-run on load
+    log('Diagnostic tool loaded. Click RUN DIAGNOSTIC to start.', 'info');
+  </script>
+</body>
+</html>

@@ -35,6 +35,8 @@ const __dirname = path.dirname(__filename);
 import { cacheManager, cacheMiddleware } from './cache-middleware.js';
 import { netflixOptimizer } from './netflix-performance-optimizer.js';
 import fetch from 'node-fetch';
+// AI MANAGER: Agentic operations for intelligent analysis
+import { analyzeCompetitor, getNewsSummary, getCompetitorAnalysis, initializeS3Client } from './ai-manager-operations.js';
 // Ensure fetch is available in Node environments without global fetch (e.g., Node < 18)
 if (!globalThis.fetch) {
   globalThis.fetch = fetch;
@@ -618,6 +620,9 @@ const s3Client = new S3Client({
   },
   retryMode: 'adaptive'
 });
+
+// Initialize AI Manager with the working s3Client
+initializeS3Client(s3Client);
 
 // R2 public URL for direct image access
 const R2_PUBLIC_URL = 'https://pub-27792cbe4fa9441b8fefa0253ea9242c.r2.dev';
@@ -3381,11 +3386,20 @@ app.post('/api/ai-image-approve', async (req, res) => {
         throw getError;
       }
       
+      // Send headers to prevent any cache from serving stale content
+      try {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, private, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
+      } catch {}
+
+      // Return strongly cache-busted URL for the ORIGINAL key
+      const instantBust = `&nuclear=1&bypass=1&nocache=1&v=${Date.now()}`;
       res.json({
         success: true,
         action: 'approved',
         message: 'Edited image has replaced the original',
-        imageUrl: `/api/r2-image/${username}/${cleanImageKey}?platform=${platform}&t=${Date.now()}`
+        imageUrl: `/api/r2-image/${username}/${cleanImageKey}?platform=${platform}${instantBust}`
       });
       
     } else { // reject
@@ -8630,6 +8644,200 @@ app.post(['/user-instagram-status/:userId', '/api/user-instagram-status/:userId'
   } catch (error) {
     console.error(`Error updating user Instagram status for ${userId}:`, error);
     res.status(500).json({ error: 'Failed to update user Instagram status' });
+  }
+});
+
+// ============================================================
+// PROFILE INFO API - Read cached profile data including competitors
+// ============================================================
+
+app.get(['/profile-info/:username', '/api/profile-info/:username'], async (req, res) => {
+  setCorsHeaders(res);
+  const { username } = req.params;
+  const platform = req.query.platform || 'instagram';
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Fetching profile for ${username} on ${platform}`);
+    
+    // Read cached profile file from data/cache/
+    const profileFilePath = path.join(__dirname, '..', 'data', 'cache', `${platform}_${username}_profile.json`);
+    
+    let profileData = null;
+    
+    // Try cache file first
+    if (fs.existsSync(profileFilePath)) {
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Reading from cache: ${profileFilePath}`);
+      profileData = JSON.parse(fs.readFileSync(profileFilePath, 'utf-8'));
+    } else {
+      // Fallback to R2 bucket
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Cache miss, trying R2 for ${username}`);
+      
+      try {
+        const r2Key = `${platform}/${username}/profile.json`;
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: r2Key,
+        });
+        const r2Response = await s3Client.send(getCommand);
+        const r2Body = await streamToString(r2Response.Body);
+        
+        if (r2Body && r2Body.trim()) {
+          profileData = JSON.parse(r2Body);
+          console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile loaded from R2: ${r2Key}`);
+        }
+      } catch (r2Error) {
+        console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] R2 fetch failed:`, r2Error.message);
+      }
+    }
+    
+    // If still no data, return 404
+    if (!profileData) {
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile not found in cache or R2 for ${username}`);
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: `No profile data for ${username} on ${platform} in cache or R2`
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile loaded successfully`);
+    
+    // Extract data structure (handle both direct and nested data)
+    let profileInfo = profileData.data ? profileData.data[0] : profileData;
+    
+    // Build response with competitor data
+    const response = {
+      username: profileInfo.username || username,
+      fullName: profileInfo.fullName || profileInfo.full_name || '',
+      biography: profileInfo.biography || profileInfo.bio || '',
+      followersCount: profileInfo.followersCount || profileInfo.followers || profileInfo.follower_count || 0,
+      followingCount: profileInfo.followsCount || profileInfo.following || profileInfo.following_count || 0,
+      postsCount: profileInfo.postsCount || profileInfo.posts_count || 0,
+      verified: profileInfo.verified || false,
+      profilePicUrl: profileInfo.profilePicUrl || profileInfo.profile_pic_url || '',
+      externalUrl: profileInfo.externalUrl || profileInfo.external_url || '',
+      isBusinessAccount: profileInfo.isBusinessAccount || profileInfo.is_business_account || false,
+      
+      // Posts data
+      posts: profileInfo.latestPosts || profileInfo.posts || [],
+      
+      // Competitor data (from relatedProfiles)
+      competitors: []
+    };
+    
+    // Extract competitor data from relatedProfiles
+    if (profileInfo.relatedProfiles && Array.isArray(profileInfo.relatedProfiles)) {
+      response.competitors = profileInfo.relatedProfiles.map(comp => ({
+        username: comp.username || comp.name || '',
+        fullName: comp.fullName || comp.full_name || '',
+        followersCount: comp.followersCount || comp.followers || comp.follower_count || 0,
+        postsCount: comp.postsCount || comp.posts_count || 0,
+        verified: comp.verified || false,
+        profilePicUrl: comp.profilePicUrl || comp.profile_pic_url || '',
+        isBusinessAccount: comp.isBusinessAccount || comp.is_business_account || false
+      }));
+      
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Found ${response.competitors.length} competitors`);
+    }
+    
+    res.json(response);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [API-PROFILE-INFO] Error:`, error);
+    res.status(500).json({
+      error: 'Failed to load profile',
+      message: error.message
+    });
+  }
+});
+
+// LinkedIn-specific profile info route
+app.get(['/profile-info/:platform/:username', '/api/profile-info/:platform/:username'], async (req, res) => {
+  setCorsHeaders(res);
+  const { platform, username } = req.params;
+  
+  try {
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Fetching ${platform} profile for ${username}`);
+    
+    // Read cached profile file from data/cache/
+    const profileFilePath = path.join(__dirname, '..', 'data', 'cache', `${platform}_${username}_profile.json`);
+    
+    let profileData = null;
+    
+    // Try cache file first
+    if (fs.existsSync(profileFilePath)) {
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Reading from cache: ${profileFilePath}`);
+      profileData = JSON.parse(fs.readFileSync(profileFilePath, 'utf-8'));
+    } else {
+      // Fallback to R2 bucket
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Cache miss, trying R2 for ${username}`);
+      
+      try {
+        const r2Key = `${platform}/${username}/profile.json`;
+        const getCommand = new GetObjectCommand({
+          Bucket: 'tasks',
+          Key: r2Key,
+        });
+        const r2Response = await s3Client.send(getCommand);
+        const r2Body = await streamToString(r2Response.Body);
+        
+        if (r2Body && r2Body.trim()) {
+          profileData = JSON.parse(r2Body);
+          console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile loaded from R2: ${r2Key}`);
+        }
+      } catch (r2Error) {
+        console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] R2 fetch failed:`, r2Error.message);
+      }
+    }
+    
+    // If still no data, return 404
+    if (!profileData) {
+      console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile not found in cache or R2 for ${username}`);
+      return res.status(404).json({
+        error: 'Profile not found',
+        message: `No profile data for ${username} on ${platform} in cache or R2`
+      });
+    }
+    
+    console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile loaded successfully`);
+    
+    // Extract data structure (handle both direct and nested data)
+    let profileInfo = profileData.data ? profileData.data[0] : profileData;
+    
+    // Build response
+    const response = {
+      username: profileInfo.username || username,
+      fullName: profileInfo.fullName || profileInfo.full_name || '',
+      biography: profileInfo.biography || profileInfo.bio || '',
+      followersCount: profileInfo.followersCount || profileInfo.followers || profileInfo.follower_count || 0,
+      followingCount: profileInfo.followsCount || profileInfo.following || profileInfo.following_count || 0,
+      postsCount: profileInfo.postsCount || profileInfo.posts_count || 0,
+      verified: profileInfo.verified || false,
+      profilePicUrl: profileInfo.profilePicUrl || profileInfo.profile_pic_url || '',
+      externalUrl: profileInfo.externalUrl || profileInfo.external_url || '',
+      isBusinessAccount: profileInfo.isBusinessAccount || profileInfo.is_business_account || false,
+      posts: profileInfo.latestPosts || profileInfo.posts || [],
+      competitors: []
+    };
+    
+    // Extract competitor data
+    if (profileInfo.relatedProfiles && Array.isArray(profileInfo.relatedProfiles)) {
+      response.competitors = profileInfo.relatedProfiles.map(comp => ({
+        username: comp.username || comp.name || '',
+        fullName: comp.fullName || comp.full_name || '',
+        followersCount: comp.followersCount || comp.followers || comp.follower_count || 0,
+        postsCount: comp.postsCount || comp.posts_count || 0,
+        verified: comp.verified || false,
+        profilePicUrl: comp.profilePicUrl || comp.profile_pic_url || '',
+        isBusinessAccount: comp.isBusinessAccount || comp.is_business_account || false
+      }));
+    }
+    
+    res.json(response);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] [API-PROFILE-INFO] Error:`, error);
+    res.status(500).json({
+      error: 'Failed to load profile',
+      message: error.message
+    });
   }
 });
 
@@ -19419,6 +19627,83 @@ app.get(['/api/run-status/:platform/:username', '/run-status/:platform/:username
     console.error(`[${new Date().toISOString()}] [RUN-STATUS] Unexpected error:`, error);
     return res.status(500).json({ error: 'Unexpected error' });
   }
+});
+
+// ===============================================================
+// AI MANAGER AGENTIC OPERATIONS
+// ===============================================================
+
+// POST /api/ai-manager/analyze-competitor
+app.post('/api/ai-manager/analyze-competitor', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId, platform, competitorUsername, username } = req.body;
+  
+  if (!platform || !competitorUsername) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Missing required fields: platform, competitorUsername' 
+    });
+  }
+  
+  console.log(`[AI-Manager] Analyzing competitor ${competitorUsername} on ${platform} for user ${userId || username}`);
+  
+  // Progress callback (for future SSE support)
+  const progressCallback = (message) => {
+    console.log(`[AI-Manager] Progress: ${message}`);
+  };
+  
+  const result = await analyzeCompetitor(userId, platform, competitorUsername, progressCallback, username);
+  return res.json(result);
+});
+
+// POST /api/ai-manager/competitor-analysis  
+app.post('/api/ai-manager/competitor-analysis', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId, platform, username, competitors } = req.body;
+  
+  if (!platform) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Missing required field: platform' 
+    });
+  }
+  
+  console.log(`[AI-Manager] Getting competitor analysis for ${platform} user ${userId || username}`);
+  if (competitors && competitors.length > 0) {
+    console.log(`[AI-Manager] Frontend provided ${competitors.length} competitors:`, competitors);
+  }
+  
+  const progressCallback = (message) => {
+    console.log(`[AI-Manager] Progress: ${message}`);
+  };
+  
+  const result = await getCompetitorAnalysis(userId, platform, progressCallback, username, competitors);
+  return res.json(result);
+});
+
+// POST /api/ai-manager/news-summary
+app.post('/api/ai-manager/news-summary', async (req, res) => {
+  setCorsHeaders(res, req.headers.origin || '*');
+  
+  const { userId, platform, username } = req.body;
+  
+  if (!platform) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Missing required field: platform' 
+    });
+  }
+  
+  console.log(`[AI-Manager] Getting news summary for ${platform} user ${userId || username}`);
+  
+  const progressCallback = (message) => {
+    console.log(`[AI-Manager] Progress: ${message}`);
+  };
+  
+  const result = await getNewsSummary(userId, platform, progressCallback, username);
+  return res.json(result);
 });
 
 // ===============================================================

@@ -3,10 +3,10 @@
  * Universal floating chatbot accessible from anywhere
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Minimize2, Maximize2, Loader, Bot } from 'lucide-react';
+import { Send, X, Minimize2, Maximize2, Loader, Bot, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AIManagerRobot } from './AIManagerRobot';
 import './AIManagerChat.css';
@@ -29,9 +29,96 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
   const [showGreeting, setShowGreeting] = useState(false);
   const [greetingMessage, setGreetingMessage] = useState('');
   const [robotName, setRobotName] = useState<string>('AI Manager');
+  const [showSuggestions, setShowSuggestions] = useState(true);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamically generate suggestions based on user context
+  const suggestedPrompts = useMemo(() => {
+    const userId = currentUser?.uid;
+    
+    // Check acquired platforms
+    const acquiredPlatforms = [];
+    if (userId) {
+      if (localStorage.getItem(`twitter_accessed_${userId}`)) acquiredPlatforms.push('twitter');
+      if (localStorage.getItem(`instagram_accessed_${userId}`)) acquiredPlatforms.push('instagram');
+      if (localStorage.getItem(`facebook_accessed_${userId}`)) acquiredPlatforms.push('facebook');
+      if (localStorage.getItem(`linkedin_accessed_${userId}`)) acquiredPlatforms.push('linkedin');
+    }
+
+    const hasNoPlatforms = acquiredPlatforms.length === 0;
+    const primaryPlatform = acquiredPlatforms[0] || 'twitter';
+
+    const suggestions = [];
+
+    // NEW USER PROMPTS (no platforms acquired yet)
+    if (hasNoPlatforms) {
+      suggestions.push(
+        { icon: '🚀', text: 'How do I get started?', category: 'onboarding' },
+        { icon: '🎯', text: 'Acquire Twitter platform', category: 'acquire' },
+        { icon: '📱', text: 'Acquire Instagram platform', category: 'acquire' },
+        { icon: '💼', text: 'Acquire LinkedIn platform', category: 'acquire' },
+        { icon: '👥', text: 'Acquire Facebook platform', category: 'acquire' },
+        { icon: '💰', text: 'Show me pricing plans', category: 'navigation' },
+        { icon: '📖', text: 'What can you do for me?', category: 'info' },
+        { icon: '🎓', text: 'Explain platform features', category: 'info' },
+        { icon: '✨', text: 'What is Sentient Marketing?', category: 'info' },
+        { icon: '🔧', text: 'Help me connect social accounts', category: 'onboarding' }
+      );
+    } 
+    // EXISTING USER PROMPTS (has platforms)
+    else {
+      // Status & Analytics
+      suggestions.push(
+        { icon: '📊', text: `Show my ${primaryPlatform} analytics`, category: 'analytics' },
+        { icon: '📈', text: `Tell me my ${primaryPlatform} stats`, category: 'analytics' },
+        { icon: '🎯', text: "What's my status across all platforms?", category: 'info' }
+      );
+
+      // News & Trending
+      suggestions.push(
+        { icon: '📰', text: `Show today's trending news for ${primaryPlatform}`, category: 'news' },
+        { icon: '🔥', text: `What's trending on ${primaryPlatform} today?`, category: 'news' }
+      );
+
+      // Content Creation
+      suggestions.push(
+        { icon: '✨', text: `Create post from today's trending news`, category: 'create' },
+        { icon: '🎨', text: `Create ${primaryPlatform} post about AI`, category: 'create' },
+        { icon: '📝', text: `Generate post ideas for ${primaryPlatform}`, category: 'create' }
+      );
+
+      // Competitor Analysis
+      suggestions.push(
+        { icon: '🔍', text: `Analyze my ${primaryPlatform} competitors`, category: 'analysis' },
+        { icon: '📊', text: `Show competitor insights for ${primaryPlatform}`, category: 'analysis' }
+      );
+
+      // Navigation & Multi-platform
+      if (acquiredPlatforms.length > 1) {
+        suggestions.push(
+          { icon: '🔄', text: 'Compare all my platform analytics', category: 'analytics' }
+        );
+      }
+
+      // Strategy
+      suggestions.push(
+        { icon: '💡', text: `Recommend ${primaryPlatform} strategies`, category: 'strategy' },
+        { icon: '🎯', text: 'What should I post today?', category: 'recommendation' }
+      );
+
+      // Add more platforms if needed
+      acquiredPlatforms.slice(1, 3).forEach(platform => {
+        suggestions.push(
+          { icon: '🐦', text: `Open ${platform} dashboard`, category: 'navigation' }
+        );
+      });
+    }
+
+    // Limit to 15 suggestions
+    return suggestions.slice(0, 15);
+  }, [currentUser?.uid, context.platform]);
 
   // Load robot name from localStorage
   useEffect(() => {
@@ -118,37 +205,38 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
   useEffect(() => {
     const initGemini = async () => {
       try {
-        const { initializeGeminiService, getGeminiService } = await import('../../services/AIManager/geminiService');
+        const { getGeminiService } = await import('../../services/AIManager/geminiService');
         const { contextService } = await import('../../services/AIManager/contextService');
         
-        // Use hardcoded key as fallback
-        const apiKey = 'AIzaSyDIpv14PCIuAukCFV4CILMhYk0OzpNI6EE';
-        initializeGeminiService(apiKey);
+        // Rely on Gemini service already initialized in App.tsx via /api/config/gemini-key
+        const service = getGeminiService();
+        
+        if (!service) {
+          console.warn('⚠️ [AIManager] Gemini service not initialized yet. Waiting for App.tsx initialization.');
+          return;
+        }
         
         // Initialize with user context
-        const service = getGeminiService();
         const userId = currentUser?.uid || 'test-user';
         const userName = initialContext?.username || localStorage.getItem('accountHolder') || 'user';
         
         console.log('🔍 [AIManager] Initializing with:', { userId, userName, currentUser: !!currentUser });
         
-        if (service) {
-          await service.initialize(userId);
-          
-          // Generate personalized greeting
-          const userContext = await contextService.getUserContext(userId);
-          userContext.username = userName; // Override with actual username
-          const greeting = await contextService.generateGreeting(userContext);
-          
-          console.log('✅ [AIManager] Context loaded:', userContext);
-          
-          // Add initial greeting message
-          setMessages([{
-            role: 'assistant',
-            content: greeting,
-            timestamp: new Date()
-          }]);
-        }
+        await service.initialize(userId);
+        
+        // Generate personalized greeting
+        const userContext = await contextService.getUserContext(userId);
+        userContext.username = userName; // Override with actual username
+        const greeting = await contextService.generateGreeting(userContext);
+        
+        console.log('✅ [AIManager] Context loaded:', userContext);
+        
+        // Add initial greeting message
+        setMessages([{
+          role: 'assistant',
+          content: greeting,
+          timestamp: new Date()
+        }]);
         
         console.log('🤖 AI Manager Gemini initialized with context');
       } catch (error) {
@@ -200,19 +288,26 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
     if (isOpen && messages.length === 0) {
       const welcomeMessage: AIMessage = {
         role: 'assistant',
-        content: `👋 Hi! I'm ${robotName}, your smartest SMM! I can help you with:\n\n• **Acquiring platforms** - "Connect my Instagram account"\n• **Creating posts** - "Create a post about AI trends"\n• **Scheduling** - "Schedule this post for 3 PM"\n• **Analytics** - "Show me Instagram analytics"\n• **Navigation** - "Open the Twitter dashboard"\n\nWhat would you like to do?`,
+        content: `👋 Hi! I'm ${robotName}, your smartest SMM! I can help you with:\n\n• **Status & Analytics** - Check your platform stats\n• **Navigation** - Open any dashboard\n• **Creating posts** - Generate engaging content\n• **Platform Management** - Connect and manage accounts\n\n💡 **Try clicking a suggestion below or ask me anything!**`,
         timestamp: new Date()
       };
       setMessages([welcomeMessage]);
+      setShowSuggestions(true);
     }
   }, [isOpen, robotName]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isProcessing) return;
+  const handleSuggestedPrompt = (promptText: string) => {
+    setInput(promptText);
+    setTimeout(() => handleSend(), 50);
+  };
 
+  const handleSend = async () => {
     const userMessage = input.trim();
+    if (!userMessage || isProcessing) return;
+
     setInput('');
     setIsProcessing(true);
+    setShowSuggestions(false); // Hide suggestions after first message
 
     try {
       const geminiService = getGeminiService();
@@ -250,6 +345,31 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
       if (assistantMessage.operationCalls && assistantMessage.operationCalls.length > 0) {
         for (const operationCall of assistantMessage.operationCalls) {
           try {
+            // Show detailed loading state based on operation type
+            const operationName = operationCall.operationId.replace(/_/g, ' ');
+            const platform = operationCall.parameters.platform || context.platform || 'instagram';
+            const username = context.username || localStorage.getItem('accountHolder') || 'user';
+            
+            let loadingContent = '';
+            if (operationCall.operationId === 'get_competitor_analysis') {
+              loadingContent = `📂 Opening competitor analysis files...\n🔍 Reading: competitor_analysis/${platform}/${username}/\n⏳ Analyzing competitive landscape with AI...`;
+            } else if (operationCall.operationId === 'get_news_summary') {
+              loadingContent = `📂 Opening trending news files...\n🔍 Reading: news_for_you/${platform}/${username}/\n⏳ Generating AI-powered summary...`;
+            } else if (operationCall.operationId === 'get_analytics') {
+              loadingContent = `📂 Opening analytics files...\n🔍 Reading: UserInstagramStatus/${username}/status.json\n⏳ Calculating metrics...`;
+            } else if (operationCall.operationId === 'create_post') {
+              loadingContent = `📂 Preparing post generation...\n🎨 Calling RAG server with ChromaDB...\n⏳ Generating content and image (30s)...`;
+            } else {
+              loadingContent = `📂 Opening files and loading data for ${operationName}...`;
+            }
+            
+            const loadingMessage: AIMessage = {
+              role: 'assistant',
+              content: loadingContent,
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, loadingMessage]);
+
             const result = await operationExecutor.execute(
               operationCall.operationId,
               operationCall.parameters,
@@ -260,6 +380,9 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
                 currentPage: context.currentPage
               }
             );
+
+            // Remove loading message and add result
+            setMessages(prev => prev.filter(msg => msg !== loadingMessage));
 
             // Update operation result in conversation
             geminiService.updateOperationResult(
@@ -312,6 +435,20 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
     setIsMinimized(!isMinimized);
   };
 
+  const clearChatHistory = () => {
+    if (confirm('Are you sure you want to delete all chat history? This cannot be undone.')) {
+      setMessages([]);
+      console.log('🗑️ [AI Manager] Chat history cleared');
+      
+      // Clear conversation memory in Gemini service
+      const service = getGeminiService();
+      if (service && currentUser?.uid) {
+        service.clearConversation();
+        console.log('🗑️ [AI Manager] Gemini conversation memory cleared');
+      }
+    }
+  };
+
   const formatMessage = (content: string) => {
     // Simple markdown-like formatting
     return content
@@ -338,7 +475,7 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            style={{ position: 'fixed', bottom: '30px', right: '30px', zIndex: 999999 }}
+            style={{ position: 'fixed', bottom: '30px', left: '30px', zIndex: 999999 }}
           >
             {/* 3D AI Robot Mascot */}
             <AIManagerRobot
@@ -393,6 +530,14 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
               <div className="ai-manager-header-actions">
                 <button
                   className="ai-manager-header-btn"
+                  onClick={clearChatHistory}
+                  title="Delete chat history"
+                  disabled={messages.length === 0}
+                >
+                  <Trash2 size={18} />
+                </button>
+                <button
+                  className="ai-manager-header-btn"
                   onClick={toggleMinimize}
                   title={isMinimized ? 'Maximize' : 'Minimize'}
                 >
@@ -442,6 +587,36 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
                   )}
                   <div ref={messagesEndRef} />
                 </div>
+
+                {/* Suggested Prompts - Always Visible */}
+                {showSuggestions && (
+                  <div className="ai-manager-suggestions">
+                    <div className="suggestions-label">
+                      💡 Quick Actions
+                      <button 
+                        className="suggestions-toggle"
+                        onClick={() => setShowSuggestions(false)}
+                        title="Hide suggestions"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="suggestions-grid">
+                      {suggestedPrompts.map((prompt, idx) => (
+                        <button
+                          key={idx}
+                          className="suggestion-chip"
+                          onClick={() => handleSuggestedPrompt(prompt.text)}
+                          disabled={isProcessing}
+                          title={prompt.text}
+                        >
+                          <span className="suggestion-icon">{prompt.icon}</span>
+                          <span className="suggestion-text">{prompt.text}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Context Display */}
                 {(context.platform || context.username) && (

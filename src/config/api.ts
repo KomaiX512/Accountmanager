@@ -88,8 +88,11 @@ export const getApiUrl = (endpoint: string, params?: string): string => {
     const isProcessingStatus = endpoint.includes('/api/processing-status');
     const isPlatformConnection = endpoint.includes('-connection') || endpoint.includes('-status');
     
-    // Use VPS backend for cross-device sync features, local for module data
-    const useVpsBackend = isRunStatus || isHealth || isProcessingStatus || isPlatformConnection;
+    // ✅ AI MANAGER: Always use LOCAL backend (has all the data)
+    const isAIManager = endpoint.includes('/api/ai-manager/');
+    
+    // Use VPS backend for cross-device sync features, local for module data and AI Manager
+    const useVpsBackend = !isAIManager && (isRunStatus || isHealth || isProcessingStatus || isPlatformConnection);
     const baseUrl = useVpsBackend ? getVpsBaseUrl() : '';
     
     const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;

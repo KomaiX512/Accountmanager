@@ -1,0 +1,35 @@
+{
+  "data": [
+    {
+      "profile_info": {
+        "username": "muhammad_muti",
+        "name": "Muhammad Muti",
+        "bio": "",
+        "website": "",
+        "location": "",
+        "profile_image_url": "",
+        "follower_count": 0,
+        "following_count": 0,
+        "tweet_count": 0,
+        "verified": false,
+        "created_at": "",
+        "engagement_metrics": {
+          "total_likes": 0,
+          "total_retweets": 0,
+          "total_replies": 0,
+          "total_quotes": 0,
+          "engagement_per_post": 0
+        },
+        "recent_posts": [],
+        "data_source": "twitter_scraper_fallback",
+        "extraction_timestamp": "2025-08-31T13:56:58.768172",
+        "note": "Default profile created due to data extraction issues",
+        "account_type": "non-branding",
+        "posting_style": "Informational",
+        "extractedAt": "2025-08-31T13:57:00.391305"
+      },
+      "note": "Placeholder due to save failure"
+    }
+  ],
+  "timestamp": "2025-10-12T05:31:37.442Z"
+}

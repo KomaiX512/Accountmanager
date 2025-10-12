@@ -496,6 +496,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     let imageExtension = 'jpg'; // Default to jpg
     
     console.log(`[ImageURL] Processing post key: ${postKey}`);
+
+    // 🔎 Detect extension up-front from any existing URLs/paths to avoid wrong edited_* extension
+    try {
+      const sourceUrl = (post?.data?.image_path || post?.data?.image_url || post?.data?.r2_image_url || '') as string;
+      const extMatch = sourceUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+      if (extMatch && extMatch[1]) {
+        imageExtension = extMatch[1].toLowerCase() === 'jpeg' ? 'jpg' : extMatch[1].toLowerCase();
+      }
+    } catch {
+      // keep default
+    }
     
     // 🎯 PRIORITY CHECK: Look for edited image URLs first (highest priority)
     if (post.data?.image_url && post.data.image_url.includes('edited_')) {
@@ -529,16 +540,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
       const imageId = standardMatch[1];
       console.log(`[ImageURL] Standard pattern detected, ID: ${imageId}`);
       
-      // 🎯 PRIORITY: Check for edited version first (edited images are always PNG)
-      const editedFilename = `edited_image_${imageId}.png`;
+      // 🎯 PRIORITY: Check for edited version first (use detected extension)
+      const editedFilename = `edited_image_${imageId}.${imageExtension}`;
       const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
       
       // 🔧 FIX 2: ALWAYS check edited version first with aggressive cache busting
       const editedUrlWithCacheBust = `${editedUrl}&nuclear=${Date.now()}&bypass=1&nocache=1`;
       
-      // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited OR if edited version exists
-      if (forceRefresh || 
-          post.data?.isEdited === true || 
+      // 🔧 CONSISTENT DISPLAY FIX: Prefer edited path only when existing URL already points to it (pre-approval preview)
+      if (
           post.data?.image_url?.includes('edited_') || 
           post.data?.r2_image_url?.includes('edited_')) {
         console.log(`[ImageURL] 🎯 Using edited version: ${editedFilename}`);
@@ -578,16 +588,15 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const campaignId = campaignMatch[1]; // This includes both ID and hash
         console.log(`[ImageURL] Campaign pattern detected, ID: ${campaignId}`);
         
-        // 🎯 PRIORITY: Check for edited campaign version first (edited images are always PNG)
-        const editedFilename = `edited_campaign_ready_post_${campaignId}.png`;
+        // 🎯 PRIORITY: Check for edited campaign version first (use detected extension)
+        const editedFilename = `edited_campaign_ready_post_${campaignId}.${imageExtension}`;
         const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
         
         // 🔧 FIX 2: Use content-based versioning for edited images to enable caching
         const editedUrlWithCacheBust = `${editedUrl}&edited=true&v=${imageRefreshKey.current}`;
         
-        // 🔧 CONSISTENT DISPLAY FIX: Always show edited version if post is marked as edited OR if edited version exists
-        if (forceRefresh || 
-            post.data?.isEdited === true || 
+        // 🔧 CONSISTENT DISPLAY FIX: Prefer edited path only when existing URL already points to it (pre-approval preview)
+        if (
             post.data?.image_url?.includes('edited_') || 
             post.data?.r2_image_url?.includes('edited_')) {
           console.log(`[ImageURL] 🎯 Using edited campaign version: ${editedFilename}`);
@@ -1422,6 +1431,40 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
             serverTimestamp: Date.now()
           }
         }));
+
+        // 🔥 Ultra-fast UX: swap the tile's URL to the server-returned cache-busted original URL
+        if (response.imageUrl) {
+          const now = Date.now();
+          setLocalPosts(prev => {
+            const updated = [...prev];
+            const idx = updated.findIndex(p => p.key === (comparisonData?.postKey || ''));
+            if (idx >= 0) {
+              const current = updated[idx];
+              updated[idx] = {
+                ...current,
+                data: {
+                  ...current.data,
+                  image_url: response.imageUrl,
+                  r2_image_url: response.imageUrl,
+                  isEdited: true
+                } as any
+              };
+            }
+            return updated;
+          });
+
+          // Clear any stale error/loading state for this tile
+          setImageErrors(prev => {
+            const copy = { ...prev };
+            delete copy[comparisonData.postKey];
+            return copy;
+          });
+          setLoadingImages(prev => {
+            const s = new Set(prev);
+            s.delete(comparisonData.postKey);
+            return s;
+          });
+        }
         
         // Force refresh to show updated image
         setTimeout(() => {

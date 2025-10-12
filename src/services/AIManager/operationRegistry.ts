@@ -55,7 +55,7 @@ export interface OperationResult {
 export const ACQUIRE_PLATFORM: OperationDefinition = {
   id: 'acquire_platform',
   name: 'Acquire Platform',
-  description: 'Acquire/connect a social media platform account (Instagram, Twitter, Facebook, LinkedIn)',
+  description: 'Acquire/connect a social media platform account. REQUIREMENTS VARY BY PLATFORM: Instagram/Twitter need username + 3 competitors. Facebook/LinkedIn need username + profileURL + 3 competitors with URLs. System will validate all requirements before acquisition.',
   category: 'platform',
   parameters: [
     {
@@ -68,24 +68,30 @@ export const ACQUIRE_PLATFORM: OperationDefinition = {
     {
       name: 'username',
       type: 'string',
-      description: 'Primary username/account name',
+      description: 'Primary username/account name (REQUIRED for all platforms)',
       required: true
+    },
+    {
+      name: 'profileURL',
+      type: 'string',
+      description: 'Full profile URL (REQUIRED for Facebook and LinkedIn ONLY, not needed for Instagram/Twitter)',
+      required: false
     },
     {
       name: 'competitors',
       type: 'array',
-      description: 'List of at least 3 competitor usernames',
+      description: 'List of exactly 3 competitors. For Instagram/Twitter: usernames only. For Facebook/LinkedIn: objects with {name, url} properties',
       required: true,
       items: {
         type: 'string',
-        description: 'Competitor username'
+        description: 'Competitor username or URL'
       }
     },
     {
       name: 'accountType',
       type: 'string',
       description: 'Type of account',
-      required: true,
+      required: false,
       enum: ['personal', 'business', 'creator', 'brand']
     },
     {

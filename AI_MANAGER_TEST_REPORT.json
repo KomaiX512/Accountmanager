@@ -1,0 +1,143 @@
+{
+  "timestamp": "2025-10-12T08:48:21.827Z",
+  "summary": {
+    "total": 12,
+    "passed": 5,
+    "failed": 7,
+    "warnings": 1,
+    "passRate": "41.7",
+    "grade": "F"
+  },
+  "passes": [
+    {
+      "query": "What's my status across all platforms?",
+      "result": {
+        "instagram": {
+          "connected": true,
+          "username": "u2023460"
+        },
+        "twitter": {
+          "connected": true,
+          "username": "muhammad_muti"
+        },
+        "facebook": {
+          "connected": true,
+          "username": "AutoPulseGlobalTrading"
+        },
+        "linkedin": {
+          "connected": true,
+          "username": "devenp"
+        }
+      }
+    },
+    {
+      "query": "Tell me competitor analysis of my Instagram",
+      "result": {
+        "success": true,
+        "message": "📊 **Competitive Analysis for INSTAGRAM**\n\nThe current competitive landscape for @u2023460 is overwhelmingly dominated by two global beauty powerhouses, @fentybeauty and @maccosmetics. These competitors command audiences of 13M+ and 23M+ followers respectively, backed by extensive content libraries (11K+ and 16K+ posts), established brand credibility via verification, and clear commercial strategies outlined in their bios. They represent the pinnacle of social media presence in the beauty industry, leveraging brand recognition, vast product lines, and diverse marketing campaigns. In contrast, @u2023460 is currently in an embryonic stage, effectively invisible within this ecosystem. With only 4 followers and a completely blank bio, the profile lacks any foundational elements for identity, purpose, or discoverability, placing it not in direct competition but rather at the very initial steps of establishing any online presence.\n\nTo effectively compete and build a foundational presence, @u2023460 must implement highly specific and strategic actions. Firstly, **define and optimize a niche brand identity.** The immediate priority is to craft a compelling bio that clearly articulates a unique value proposition, target audience, and what differentiates the profile, e.g., \"Your guide to ethical indie beauty for sensitive skin\" or \"Mastering everyday makeup for busy professionals.\" This provides instant clarity and discoverability. Secondly, **launch a consistent, hyper-niche content strategy.** Instead of broadly emulating the competitors, focus on an underserved segment within beauty (e.g., in-depth reviews of a specific ingredient, sustainable beauty hacks, beginner-friendly tutorials for a niche demographic). Plan and execute a content calendar of 3-5 high-quality posts/reels per week, utilizing relevant trending audio and hashtags to maximize reach within this niche, building authority and a dedicated audience. Finally, **prioritize active community engagement and networking.** Actively seek out and meaningfully interact with smaller beauty creators, engaging with their content, participating in relevant hashtag conversations, and responding thoughtfully to any followers. This grassroots approach fosters genuine connections, increases visibility through interaction, and transforms the profile from a dormant account into an active participant within a targeted community.\n\n**Your Stats:**\n• Followers: 4\n• Competitors Analyzed: 2",
+        "duration": 9770,
+        "hallucinations": []
+      }
+    },
+    {
+      "query": "Show my Instagram analytics",
+      "result": {
+        "success": true,
+        "followers": 4,
+        "following": 0,
+        "posts": 24,
+        "duration": 423
+      }
+    },
+    {
+      "query": "Give me today's trending news on Instagram",
+      "result": {
+        "success": true,
+        "message": "📰 **Trending News on INSTAGRAM**\n\nHere's a look at what's trending in the business world, showing how celebrity power and strategic vision are shaking up established industries.\n\n**Brief Overview:**\nThe current social media pulse highlights a powerful trend: celebrity entrepreneurs aren't just endorsing, they're building empires. This shift demonstrates how authentic brand messaging, combined with strategic business models, can effectively disrupt long-standing industries and challenge traditional giants, proving that influence coupled with innovation is a formidable force.\n\n**Key News Item:**\n\n1.  **Rare Beauty's Entrepreneurial Masterclass:** Selena Gomez's Rare Beauty isn't just a beauty brand; it's a prime example of successful celebrity-led entrepreneurship. The WSJ breakdown illustrates how her strategic market entry and unique business model have carved out a significant niche, proving that a genuine connection and innovative approach can challenge cosmetics giants and deliver impressive impact and growth.",
+        "duration": 8566,
+        "hallucinations": [
+          "Expected username @u2023460 not found in response"
+        ]
+      }
+    },
+    {
+      "query": "Show my Twitter stats",
+      "result": {
+        "success": true,
+        "followers": 0,
+        "following": 0,
+        "posts": 0,
+        "duration": 433
+      }
+    }
+  ],
+  "failures": [
+    {
+      "query": "Analyze my Twitter competitors",
+      "result": {
+        "success": false,
+        "hallucinations": [
+          "No numerical data in response (possible hallucination)",
+          "Expected username @muhammad_muti not found in response"
+        ]
+      }
+    },
+    {
+      "query": "Show my Facebook analytics",
+      "result": {
+        "success": false,
+        "status": 404
+      }
+    },
+    {
+      "query": "Analyze Facebook competitors",
+      "result": {
+        "success": false,
+        "hallucinations": [
+          "No numerical data in response (possible hallucination)",
+          "Expected username @AutoPulseGlobalTrading not found in response"
+        ]
+      }
+    },
+    {
+      "query": "Give me LinkedIn analytics",
+      "result": {
+        "success": false,
+        "status": 500
+      }
+    },
+    {
+      "query": "Create a post for Instagram about today's trending news",
+      "result": {
+        "success": false,
+        "status": 500,
+        "error": "Failed to generate post"
+      }
+    },
+    {
+      "query": "Make a Twitter post about AI technology",
+      "result": {
+        "success": false,
+        "status": 500,
+        "error": "Failed to generate post"
+      }
+    },
+    {
+      "query": "Create a post for Facebook (not acquired)",
+      "result": {
+        "success": false,
+        "status": 500,
+        "error": "Failed to generate post"
+      }
+    }
+  ],
+  "warnings": [
+    "twitter analytics: All metrics zero"
+  ],
+  "improvements": [
+    "❌ Fix failing operations - AI Manager not fully functional",
+    "⚠️ Address warnings - data quality issues detected",
+    "❌ Post creation failing - RAG server integration broken",
+    "❌ Hallucination detected - AI returning fake data instead of backend data"
+  ]
+}

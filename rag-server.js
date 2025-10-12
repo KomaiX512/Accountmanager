@@ -254,7 +254,7 @@ async function streamToString(stream) {
 // Configure Gemini API with enhanced rate limiting
 const GEMINI_CONFIG = {
   apiKey: 'AIzaSyDIpv14PCIuAukCFV4CILMhYk0OzpNI6EE',
-  model: 'gemini-2.0-flash',
+  model: 'gemini-2.5-flash',
   maxTokens: 4000, // Increased for comprehensive LinkedIn responses
   temperature: 0.2,
   topP: 0.95,

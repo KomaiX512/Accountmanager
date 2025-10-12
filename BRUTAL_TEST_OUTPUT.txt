@@ -1,0 +1,241 @@
+[35m
+================================================================================[0m
+[1m[31m🔥 BRUTAL AI MANAGER STRESS TEST - NO SUGAR COATING 🔥[0m
+[35m================================================================================
+[0m
+[36m📋 Running 12 comprehensive tests...
+[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 1/12: "What's my status across all platforms?"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+📋 TEST: Platform Status Detection[0m
+[32m✅ INSTAGRAM Status[0m
+[36m   Not connected (correct detection)[0m
+[32m✅ TWITTER Status[0m
+[36m   Not connected (correct detection)[0m
+[32m✅ FACEBOOK Status[0m
+[36m   Not connected (correct detection)[0m
+[32m✅ LINKEDIN Status[0m
+[36m   Not connected (correct detection)[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 2/12: "Tell me competitor analysis of my Instagram"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+🔍 TEST: Competitor Analysis - INSTAGRAM[0m
+[32m✅ Username Resolution[0m
+[36m   Resolved to @undefined[0m
+[33m📡 Calling /api/ai-manager/competitor-analysis...[0m
+[36m⏱️ Response time: 446ms[0m
+[32m✅ API Response[0m
+[36m   Status 200 in 446ms[0m
+[31m❌ Hallucination Check[0m
+[36m   No numerical data in response (possible hallucination)[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 3/12: "Show my Instagram analytics"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+📊 TEST: Analytics - INSTAGRAM[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/profile-info/undefined?platform=instagram...[0m
+[31m❌ Analytics API[0m
+[36m   Status 404[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 4/12: "Give me today's trending news on Instagram"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+📰 TEST: News Summary - INSTAGRAM[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/ai-manager/news-summary...[0m
+[32m✅ News API[0m
+[36m   Status 200 in 444ms[0m
+[33m⚠️ Hallucination Check[0m
+[36m   No numerical data in response (possible hallucination)[0m
+[35m
+📄 NEWS SUMMARY PREVIEW:[0m
+[36m❌ Failed to get news: Could not retrieve instagram username: The specified key does not exist....[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 5/12: "Analyze my Twitter competitors"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+🔍 TEST: Competitor Analysis - TWITTER[0m
+[32m✅ Username Resolution[0m
+[36m   Resolved to @undefined[0m
+[33m📡 Calling /api/ai-manager/competitor-analysis...[0m
+[36m⏱️ Response time: 671ms[0m
+[32m✅ API Response[0m
+[36m   Status 200 in 671ms[0m
+[31m❌ Hallucination Check[0m
+[36m   No numerical data in response (possible hallucination)[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 6/12: "Show my Twitter stats"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+📊 TEST: Analytics - TWITTER[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/profile-info/undefined?platform=twitter...[0m
+[31m❌ Analytics API[0m
+[36m   Status 404[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 7/12: "Show my Facebook analytics"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+📊 TEST: Analytics - FACEBOOK[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/profile-info/undefined?platform=facebook...[0m
+[31m❌ Analytics API[0m
+[36m   Status 404[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 8/12: "Analyze Facebook competitors"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+🔍 TEST: Competitor Analysis - FACEBOOK[0m
+[32m✅ Username Resolution[0m
+[36m   Resolved to @undefined[0m
+[33m📡 Calling /api/ai-manager/competitor-analysis...[0m
+[36m⏱️ Response time: 426ms[0m
+[32m✅ API Response[0m
+[36m   Status 200 in 426ms[0m
+[31m❌ Hallucination Check[0m
+[36m   No numerical data in response (possible hallucination)[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 9/12: "Give me LinkedIn analytics"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+📊 TEST: Analytics - LINKEDIN[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/profile-info/linkedin/undefined...[0m
+[31m❌ Analytics API[0m
+[36m   Status 404[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 10/12: "Create a post for Instagram about today's trending news"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+✍️ TEST: Post Creation - INSTAGRAM[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/post-generator (RAG)...[0m
+[33m⚠️ This may take 30-60 seconds...[0m
+[36m⏱️ Response time: 0.0s[0m
+[31m❌ Post Generation[0m
+[36m   Status 500: Failed to generate post[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 11/12: "Make a Twitter post about AI technology"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+✍️ TEST: Post Creation - TWITTER[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/post-generator (RAG)...[0m
+[33m⚠️ This may take 30-60 seconds...[0m
+[36m⏱️ Response time: 0.0s[0m
+[31m❌ Post Generation[0m
+[36m   Status 500: Failed to generate post[0m
+[33m
+⏸️ Waiting 2 seconds before next test...[0m
+[34m
+────────────────────────────────────────────────────────────────────────────────[0m
+[1m[33mTEST 12/12: "Create a post for Facebook (not acquired)"[0m
+[34m────────────────────────────────────────────────────────────────────────────────[0m
+[1m
+✍️ TEST: Post Creation - FACEBOOK[0m
+[32m✅ Username Resolution[0m
+[36m   @undefined[0m
+[33m📡 Calling /api/post-generator (RAG)...[0m
+[33m⚠️ This may take 30-60 seconds...[0m
+[36m⏱️ Response time: 0.0s[0m
+[31m❌ Post Generation[0m
+[36m   Status 500: Failed to generate post[0m
+[35m
+
+================================================================================[0m
+[1m[36m📊 FINAL BRUTAL HONEST REPORT[0m
+[35m================================================================================
+[0m
+[36mTotal Tests: 12[0m
+[32m✅ Passed: 2[0m
+[31m❌ Failed: 10[0m
+[33m⚠️ Warnings: 0[0m
+[31m
+📈 Pass Rate: 16.7% (Grade: F)[0m
+[31m
+❌ FAILURES (10):[0m
+[33m
+1. "Tell me competitor analysis of my Instagram"[0m
+[31m   Reason: Unknown[0m
+[33m
+2. "Show my Instagram analytics"[0m
+[31m   Reason: Unknown[0m
+[33m
+3. "Analyze my Twitter competitors"[0m
+[31m   Reason: Unknown[0m
+[33m
+4. "Show my Twitter stats"[0m
+[31m   Reason: Unknown[0m
+[33m
+5. "Show my Facebook analytics"[0m
+[31m   Reason: Unknown[0m
+[33m
+6. "Analyze Facebook competitors"[0m
+[31m   Reason: Unknown[0m
+[33m
+7. "Give me LinkedIn analytics"[0m
+[31m   Reason: Unknown[0m
+[33m
+8. "Create a post for Instagram about today's trending news"[0m
+[31m   Reason: Failed to generate post[0m
+[33m
+9. "Make a Twitter post about AI technology"[0m
+[31m   Reason: Failed to generate post[0m
+[33m
+10. "Create a post for Facebook (not acquired)"[0m
+[31m   Reason: Failed to generate post[0m
+[1m[33m
+
+🔧 AREAS REQUIRING IMPROVEMENT:[0m
+[33m────────────────────────────────────────────────────────────────────────────────[0m
+[31m1. ❌ Fix failing operations - AI Manager not fully functional[0m
+[31m2. ❌ Post creation failing - RAG server integration broken[0m
+[31m3. ❌ Hallucination detected - AI returning fake data instead of backend data[0m
+[35m
+================================================================================[0m
+[31m🏁 TEST COMPLETE - NEEDS MAJOR WORK[0m
+[35m================================================================================
+[0m
+[36m📄 Full report saved to: ./AI_MANAGER_TEST_REPORT.json[0m

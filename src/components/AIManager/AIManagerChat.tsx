@@ -6,13 +6,16 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, X, Minimize2, Maximize2, Loader, Bot, Trash2 } from 'lucide-react';
+import { Loader, Bot } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AIManagerRobot } from './AIManagerRobot';
+import { AIManagerNotification } from './AIManagerNotification';
 import './AIManagerChat.css';
 import { getGeminiService, AIMessage } from '../../services/AIManager/geminiService';
 import { operationExecutor } from '../../services/AIManager/operationExecutor';
 import { OperationContext } from '../../services/AIManager/operationRegistry';
+import axios from 'axios';
+import { getApiUrl } from '../../config/api';
 
 interface AIManagerChatProps {
   initialContext?: Partial<OperationContext>;
@@ -55,63 +58,67 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
     // NEW USER PROMPTS (no platforms acquired yet)
     if (hasNoPlatforms) {
       suggestions.push(
-        { icon: '🚀', text: 'How do I get started?', category: 'onboarding' },
-        { icon: '🎯', text: 'Acquire Twitter platform', category: 'acquire' },
-        { icon: '📱', text: 'Acquire Instagram platform', category: 'acquire' },
-        { icon: '💼', text: 'Acquire LinkedIn platform', category: 'acquire' },
-        { icon: '👥', text: 'Acquire Facebook platform', category: 'acquire' },
-        { icon: '💰', text: 'Show me pricing plans', category: 'navigation' },
-        { icon: '📖', text: 'What can you do for me?', category: 'info' },
-        { icon: '🎓', text: 'Explain platform features', category: 'info' },
-        { icon: '✨', text: 'What is Sentient Marketing?', category: 'info' },
-        { icon: '🔧', text: 'Help me connect social accounts', category: 'onboarding' }
+        { icon: 'fas fa-rocket', text: 'How do I get started?', category: 'onboarding' },
+        { icon: 'fab fa-twitter', text: 'Acquire Twitter platform', category: 'acquire' },
+        { icon: 'fab fa-instagram', text: 'Acquire Instagram platform', category: 'acquire' },
+        { icon: 'fab fa-linkedin', text: 'Acquire LinkedIn platform', category: 'acquire' },
+        { icon: 'fab fa-facebook', text: 'Acquire Facebook platform', category: 'acquire' },
+        { icon: 'fas fa-dollar-sign', text: 'Show me pricing plans', category: 'navigation' },
+        { icon: 'fas fa-book-open', text: 'What can you do for me?', category: 'info' },
+        { icon: 'fas fa-graduation-cap', text: 'Explain platform features', category: 'info' },
+        { icon: 'fas fa-magic', text: 'What is Sentient Marketing?', category: 'info' },
+        { icon: 'fas fa-cogs', text: 'Help me connect social accounts', category: 'onboarding' }
       );
     } 
     // EXISTING USER PROMPTS (has platforms)
     else {
       // Status & Analytics
       suggestions.push(
-        { icon: '📊', text: `Show my ${primaryPlatform} analytics`, category: 'analytics' },
-        { icon: '📈', text: `Tell me my ${primaryPlatform} stats`, category: 'analytics' },
-        { icon: '🎯', text: "What's my status across all platforms?", category: 'info' }
+        { icon: 'fas fa-chart-bar', text: `Show my ${primaryPlatform} analytics`, category: 'analytics' },
+        { icon: 'fas fa-chart-line', text: `Tell me my ${primaryPlatform} stats`, category: 'analytics' },
+        { icon: 'fas fa-crosshairs', text: "What's my status across all platforms?", category: 'info' }
       );
 
       // News & Trending
       suggestions.push(
-        { icon: '📰', text: `Show today's trending news for ${primaryPlatform}`, category: 'news' },
-        { icon: '🔥', text: `What's trending on ${primaryPlatform} today?`, category: 'news' }
+        { icon: 'fas fa-newspaper', text: `Show today's trending news for ${primaryPlatform}`, category: 'news' },
+        { icon: 'fas fa-fire', text: `What's trending on ${primaryPlatform} today?`, category: 'news' }
       );
 
       // Content Creation
       suggestions.push(
-        { icon: '✨', text: `Create post from today's trending news`, category: 'create' },
-        { icon: '🎨', text: `Create ${primaryPlatform} post about AI`, category: 'create' },
-        { icon: '📝', text: `Generate post ideas for ${primaryPlatform}`, category: 'create' }
+        { icon: 'fas fa-magic', text: `Create post from today's trending news`, category: 'create' },
+        { icon: 'fas fa-palette', text: `Create ${primaryPlatform} post about AI`, category: 'create' },
+        { icon: 'fas fa-edit', text: `Generate post ideas for ${primaryPlatform}`, category: 'create' }
       );
 
       // Competitor Analysis
       suggestions.push(
-        { icon: '🔍', text: `Analyze my ${primaryPlatform} competitors`, category: 'analysis' },
-        { icon: '📊', text: `Show competitor insights for ${primaryPlatform}`, category: 'analysis' }
+        { icon: 'fas fa-search', text: `Analyze my ${primaryPlatform} competitors`, category: 'analysis' },
+        { icon: 'fas fa-chart-pie', text: `Show competitor insights for ${primaryPlatform}`, category: 'analysis' }
       );
 
       // Navigation & Multi-platform
       if (acquiredPlatforms.length > 1) {
         suggestions.push(
-          { icon: '🔄', text: 'Compare all my platform analytics', category: 'analytics' }
+          { icon: 'fas fa-sync-alt', text: 'Compare all my platform analytics', category: 'analytics' }
         );
       }
 
       // Strategy
       suggestions.push(
-        { icon: '💡', text: `Recommend ${primaryPlatform} strategies`, category: 'strategy' },
-        { icon: '🎯', text: 'What should I post today?', category: 'recommendation' }
+        { icon: 'fas fa-lightbulb', text: `Recommend ${primaryPlatform} strategies`, category: 'strategy' },
+        { icon: 'fas fa-bullseye', text: 'What should I post today?', category: 'recommendation' }
       );
 
       // Add more platforms if needed
       acquiredPlatforms.slice(1, 3).forEach(platform => {
+        const platformIcon = platform === 'twitter' ? 'fab fa-twitter' :
+                           platform === 'instagram' ? 'fab fa-instagram' :
+                           platform === 'facebook' ? 'fab fa-facebook' :
+                           platform === 'linkedin' ? 'fab fa-linkedin' : 'fas fa-share-alt';
         suggestions.push(
-          { icon: '🐦', text: `Open ${platform} dashboard`, category: 'navigation' }
+          { icon: platformIcon, text: `Open ${platform} dashboard`, category: 'navigation' }
         );
       });
     }
@@ -129,13 +136,201 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
     }
   }, []);
 
-  // Debug render
-  console.log('🤖 AIManagerChat RENDERED', {
-    isOpen,
-    currentUser: !!currentUser,
-    context,
-    robotName
-  });
+  // CRITICAL: Force AI Manager to be viewport-fixed regardless of parent CSS
+  useEffect(() => {
+    const styleId = 'ai-manager-viewport-fix';
+    let styleElement = document.getElementById(styleId) as HTMLStyleElement;
+    
+    if (!styleElement) {
+      styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      styleElement.textContent = `
+        /* ULTRA-ROBUST: Force AI Manager viewport positioning */
+        .ai-manager-button-container,
+        .ai-manager-window,
+        .ai-manager-greeting-bubble {
+          position: fixed !important;
+          transform: translateZ(0) !important;
+          isolation: isolate !important;
+          contain: none !important;
+          z-index: 2147483647 !important;
+          backface-visibility: visible !important;
+          perspective: none !important;
+          transform-style: flat !important;
+        }
+        
+        /* SPECIFIC CHAT WINDOW FIXES */
+        .ai-manager-window {
+          position: fixed !important;
+          bottom: 30px !important;
+          left: 30px !important;
+          top: auto !important;
+          right: auto !important;
+          margin: 0 !important;
+          transform: translateZ(0) !important;
+          isolation: isolate !important;
+          contain: none !important;
+          z-index: 2147483647 !important;
+          backface-visibility: visible !important;
+          perspective: none !important;
+          transform-style: flat !important;
+        }
+        
+        /* MAXIMUM SPECIFICITY FOR CHAT WINDOW */
+        html body .ai-manager-window,
+        body .ai-manager-window,
+        .ai-manager-window {
+          position: fixed !important;
+          bottom: 30px !important;
+          left: 30px !important;
+          top: auto !important;
+          right: auto !important;
+          margin: 0 !important;
+          transform: translateZ(0) !important;
+          isolation: isolate !important;
+          contain: none !important;
+          z-index: 2147483647 !important;
+        }
+        
+        /* Neutralize any parent transforms */
+        html:has(.ai-manager-button-container),
+        body:has(.ai-manager-button-container),
+        #root:has(.ai-manager-button-container),
+        .pricing-page:has(.ai-manager-button-container),
+        .privacy-policy-page:has(.ai-manager-button-container),
+        .dashboard-page:has(.ai-manager-button-container),
+        .homepage:has(.ai-manager-button-container) {
+          transform: none !important;
+          perspective: none !important;
+          contain: none !important;
+        }
+        
+        /* CRITICAL: Override any page-specific positioning that might affect chat window */
+        .pricing-page .ai-manager-window,
+        .privacy-policy-page .ai-manager-window,
+        .dashboard-page .ai-manager-window,
+        .homepage .ai-manager-window {
+          position: fixed !important;
+          bottom: 30px !important;
+          left: 30px !important;
+          top: auto !important;
+          right: auto !important;
+          margin: 0 !important;
+          transform: translateZ(0) !important;
+          isolation: isolate !important;
+          contain: none !important;
+          z-index: 2147483647 !important;
+        }
+      `;
+      document.head.appendChild(styleElement);
+      console.log('🔧 [AI Manager] Viewport positioning fix applied');
+      
+      // Debug: Log current positioning info
+      const debugInfo = () => {
+        const container = document.querySelector('.ai-manager-button-container');
+        const chatWindow = document.querySelector('.ai-manager-window');
+        
+        if (container) {
+          const computedStyle = window.getComputedStyle(container);
+          console.log('🔍 [AI Manager] Button container positioning:', {
+            position: computedStyle.position,
+            zIndex: computedStyle.zIndex,
+            transform: computedStyle.transform,
+            isolation: computedStyle.isolation,
+            contain: computedStyle.contain,
+            isViewportFixed: computedStyle.position === 'fixed'
+          });
+        }
+        
+        if (chatWindow) {
+          const computedStyle = window.getComputedStyle(chatWindow);
+          console.log('🔍 [AI Manager] Chat window positioning:', {
+            position: computedStyle.position,
+            zIndex: computedStyle.zIndex,
+            transform: computedStyle.transform,
+            isolation: computedStyle.isolation,
+            contain: computedStyle.contain,
+            isViewportFixed: computedStyle.position === 'fixed',
+            bottom: computedStyle.bottom,
+            left: computedStyle.left,
+            top: computedStyle.top,
+            right: computedStyle.right
+          });
+        }
+      };
+      
+      // Debug after a short delay to ensure styles are applied
+      setTimeout(debugInfo, 100);
+      
+      // ULTRA-ROBUST: Monitor for chat window creation and force positioning
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element;
+              if (element.classList?.contains('ai-manager-window') || 
+                  element.querySelector?.('.ai-manager-window')) {
+                setTimeout(() => {
+                  const chatWindow = element.classList?.contains('ai-manager-window') 
+                    ? element as HTMLElement 
+                    : element.querySelector('.ai-manager-window') as HTMLElement;
+                  
+                  if (chatWindow) {
+                    // Remove any existing inline styles first
+                    chatWindow.removeAttribute('style');
+                    chatWindow.style.cssText = `
+                      position: fixed !important;
+                      bottom: 30px !important;
+                      left: 30px !important;
+                      top: auto !important;
+                      right: auto !important;
+                      margin: 0 !important;
+                      transform: translateZ(0) !important;
+                      isolation: isolate !important;
+                      contain: none !important;
+                      z-index: 2147483647 !important;
+                      backface-visibility: visible !important;
+                      perspective: none !important;
+                      transform-style: flat !important;
+                    `;
+                    console.log('🔧 [AI Manager] Chat window positioning forced via MutationObserver (Framer Motion override)');
+                  }
+                }, 10);
+              }
+            }
+          });
+        });
+      });
+      
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+      
+      // Store observer for cleanup
+      (window as any).aiManagerObserver = observer;
+    }
+
+    return () => {
+      // Clean up when component unmounts
+      if (styleElement && styleElement.parentNode) {
+        styleElement.parentNode.removeChild(styleElement);
+        console.log('🔧 [AI Manager] Viewport positioning fix removed');
+      }
+      
+      // Clean up MutationObserver
+      if ((window as any).aiManagerObserver) {
+        (window as any).aiManagerObserver.disconnect();
+        delete (window as any).aiManagerObserver;
+        console.log('🔧 [AI Manager] MutationObserver cleaned up');
+      }
+    };
+  }, []);
+
+  // AI Manager render status (minimal logging)
+  console.log('🤖 AI Manager active on:', window.location.pathname);
+  
+  // AI Manager is working correctly - debug logging removed
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -148,6 +343,94 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
       inputRef.current?.focus();
     }
   }, [isOpen, isMinimized]);
+
+  // CRITICAL: Force chat window to be viewport-fixed when opened
+  useEffect(() => {
+    if (isOpen) {
+      const forceChatWindowPosition = () => {
+        const chatWindow = document.querySelector('.ai-manager-window');
+        if (chatWindow) {
+          // Apply inline styles to override any CSS conflicts and Framer Motion transforms
+          (chatWindow as HTMLElement).style.cssText = `
+            position: fixed !important;
+            bottom: 30px !important;
+            left: 30px !important;
+            top: auto !important;
+            right: auto !important;
+            margin: 0 !important;
+            transform: translateZ(0) !important;
+            isolation: isolate !important;
+            contain: none !important;
+            z-index: 2147483647 !important;
+            backface-visibility: visible !important;
+            perspective: none !important;
+            transform-style: flat !important;
+          `;
+          
+          // Also override any Framer Motion inline styles
+          (chatWindow as HTMLElement).removeAttribute('style');
+          (chatWindow as HTMLElement).style.cssText = `
+            position: fixed !important;
+            bottom: 30px !important;
+            left: 30px !important;
+            top: auto !important;
+            right: auto !important;
+            margin: 0 !important;
+            transform: translateZ(0) !important;
+            isolation: isolate !important;
+            contain: none !important;
+            z-index: 2147483647 !important;
+            backface-visibility: visible !important;
+            perspective: none !important;
+            transform-style: flat !important;
+          `;
+          
+          console.log('🔧 [AI Manager] Chat window positioning forced via inline styles (Framer Motion override)');
+        }
+      };
+
+      // Apply immediately and after multiple delays to catch Framer Motion
+      forceChatWindowPosition();
+      setTimeout(forceChatWindowPosition, 10);
+      setTimeout(forceChatWindowPosition, 50);
+      setTimeout(forceChatWindowPosition, 100);
+      setTimeout(forceChatWindowPosition, 200);
+      setTimeout(forceChatWindowPosition, 500);
+    }
+  }, [isOpen]);
+
+  // ULTRA-AGGRESSIVE: Continuous monitoring and fixing of chat window positioning
+  useEffect(() => {
+    if (isOpen) {
+      const interval = setInterval(() => {
+        const chatWindow = document.querySelector('.ai-manager-window');
+        if (chatWindow) {
+          const computedStyle = window.getComputedStyle(chatWindow);
+          if (computedStyle.position !== 'fixed') {
+            console.log('🚨 [AI Manager] Chat window lost fixed positioning, forcing fix...');
+            (chatWindow as HTMLElement).removeAttribute('style');
+            (chatWindow as HTMLElement).style.cssText = `
+              position: fixed !important;
+              bottom: 30px !important;
+              left: 30px !important;
+              top: auto !important;
+              right: auto !important;
+              margin: 0 !important;
+              transform: translateZ(0) !important;
+              isolation: isolate !important;
+              contain: none !important;
+              z-index: 2147483647 !important;
+              backface-visibility: visible !important;
+              perspective: none !important;
+              transform-style: flat !important;
+            `;
+          }
+        }
+      }, 100); // Check every 100ms
+
+      return () => clearInterval(interval);
+    }
+  }, [isOpen]);
 
   // Generate greeting message based on time and last visit
   useEffect(() => {
@@ -218,15 +501,15 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
         
         // Initialize with user context
         const userId = currentUser?.uid || 'test-user';
-        const userName = initialContext?.username || localStorage.getItem('accountHolder') || 'user';
+        const realName = currentUser?.displayName || 'user';
         
-        console.log('🔍 [AIManager] Initializing with:', { userId, userName, currentUser: !!currentUser });
+        console.log('🔍 [AIManager] Initializing with:', { userId, realName, currentUser: !!currentUser });
         
-        await service.initialize(userId);
+        // CRITICAL: Pass real name from Firebase to service
+        await service.initialize(userId, realName);
         
         // Generate personalized greeting
-        const userContext = await contextService.getUserContext(userId);
-        userContext.username = userName; // Override with actual username
+        const userContext = await contextService.getUserContext(userId, realName);
         const greeting = await contextService.generateGreeting(userContext);
         
         console.log('✅ [AIManager] Context loaded:', userContext);
@@ -266,14 +549,7 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
         }));
       }
 
-      // Get username from localStorage
-      const accountHolder = localStorage.getItem('accountHolder');
-      if (accountHolder) {
-        setContext(prev => ({
-          ...prev,
-          username: accountHolder
-        }));
-      }
+      // Do not derive username from localStorage; backend is source of truth
     };
 
     updateContext();
@@ -324,17 +600,18 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
       };
       setMessages(prev => [...prev, userMsg]);
 
-      // Get user ID
+      // Get user ID and real name
       const userId = currentUser?.uid || 'anonymous';
+      const realName = currentUser?.displayName || undefined;
 
-      // Process message with Gemini
+      // Process message with Gemini (pass real name, NOT platform username)
       const assistantMessage = await geminiService.processMessage(
         userId,
         userMessage,
         {
           ...context,
           userId,
-          username: context.username || localStorage.getItem('accountHolder') || undefined
+          realName // Pass real name from Firebase for AI to address user correctly
         }
       );
 
@@ -348,15 +625,31 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
             // Show detailed loading state based on operation type
             const operationName = operationCall.operationId.replace(/_/g, ' ');
             const platform = operationCall.parameters.platform || context.platform || 'instagram';
-            const username = context.username || localStorage.getItem('accountHolder') || 'user';
+            // Resolve accurate platform-specific username from backend R2 status
+            const resolvePlatformUsername = async (plat: string, uid?: string) => {
+              if (!uid) return null;
+              try {
+                const resp = await axios.get(
+                  getApiUrl(`/api/user-${plat}-status/${uid}`),
+                  { timeout: 5000, validateStatus: () => true }
+                );
+                if (resp.status >= 200 && resp.status < 300) {
+                  return resp.data?.[`${plat}_username`] || null;
+                }
+              } catch {}
+              return null;
+            };
+            const username = await resolvePlatformUsername(platform, userId) || context.username || undefined;
             
             let loadingContent = '';
             if (operationCall.operationId === 'get_competitor_analysis') {
-              loadingContent = `📂 Opening competitor analysis files...\n🔍 Reading: competitor_analysis/${platform}/${username}/\n⏳ Analyzing competitive landscape with AI...`;
+              const userPath = username ? `${platform}/${username}` : `${platform}`;
+              loadingContent = `📂 Opening competitor analysis files...\n🔍 Reading: competitor_analysis/${userPath}/\n⏳ Analyzing competitive landscape with AI...`;
             } else if (operationCall.operationId === 'get_news_summary') {
-              loadingContent = `📂 Opening trending news files...\n🔍 Reading: news_for_you/${platform}/${username}/\n⏳ Generating AI-powered summary...`;
+              const userPath = username ? `${platform}/${username}` : `${platform}`;
+              loadingContent = `📂 Opening trending news files...\n🔍 Reading: news_for_you/${userPath}/\n⏳ Generating AI-powered summary...`;
             } else if (operationCall.operationId === 'get_analytics') {
-              loadingContent = `📂 Opening analytics files...\n🔍 Reading: UserInstagramStatus/${username}/status.json\n⏳ Calculating metrics...`;
+              loadingContent = `📂 Opening analytics files...\n⏳ Calculating metrics...`;
             } else if (operationCall.operationId === 'create_post') {
               loadingContent = `📂 Preparing post generation...\n🎨 Calling RAG server with ChromaDB...\n⏳ Generating content and image (30s)...`;
             } else {
@@ -376,7 +669,7 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
               {
                 userId,
                 platform: context.platform,
-                username: context.username || localStorage.getItem('accountHolder') || undefined,
+                username: context.username || undefined,
                 currentPage: context.currentPage
               }
             );
@@ -467,6 +760,9 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
   // Render using Portal to ensure it's outside App div and always on top
   const content = (
     <>
+      {/* Proactive AI Manager Notification */}
+      <AIManagerNotification onOpenChat={() => setIsOpen(true)} />
+      
       {/* Floating Toggle Button */}
       <AnimatePresence>
         {!isOpen && (
@@ -507,12 +803,17 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
       {/* Chat Window */}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
+          <div
             className={`ai-manager-window ${isMinimized ? 'minimized' : ''}`}
-            initial={{ scale: 0.8, opacity: 0, y: 100 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.8, opacity: 0, y: 100 }}
-            transition={{ type: 'spring', damping: 25 }}
+            style={{ 
+              position: 'fixed', 
+              bottom: '30px', 
+              left: '30px', 
+              zIndex: 2147483647,
+              transform: 'translateZ(0)',
+              isolation: 'isolate',
+              contain: 'none'
+            }}
           >
             {/* Header */}
             <div className="ai-manager-header">
@@ -534,21 +835,21 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
                   title="Delete chat history"
                   disabled={messages.length === 0}
                 >
-                  <Trash2 size={18} />
+                  <i className="fas fa-trash-alt" style={{ fontSize: '18px' }}></i>
                 </button>
                 <button
                   className="ai-manager-header-btn"
                   onClick={toggleMinimize}
                   title={isMinimized ? 'Maximize' : 'Minimize'}
                 >
-                  {isMinimized ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+                  {isMinimized ? <i className="fas fa-expand-alt" style={{ fontSize: '18px' }}></i> : <i className="fas fa-compress-alt" style={{ fontSize: '18px' }}></i>}
                 </button>
                 <button
                   className="ai-manager-header-btn"
                   onClick={() => setIsOpen(false)}
                   title="Close"
                 >
-                  <X size={18} />
+                  <i className="fas fa-times" style={{ fontSize: '18px' }}></i>
                 </button>
               </div>
             </div>
@@ -610,7 +911,7 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
                           disabled={isProcessing}
                           title={prompt.text}
                         >
-                          <span className="suggestion-icon">{prompt.icon}</span>
+                          <i className={`suggestion-icon ${prompt.icon}`}></i>
                           <span className="suggestion-text">{prompt.text}</span>
                         </button>
                       ))}
@@ -651,12 +952,12 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
                     onClick={handleSend}
                     disabled={!input.trim() || isProcessing}
                   >
-                    <Send size={20} />
+                    <i className="fas fa-paper-plane" style={{ fontSize: '20px' }}></i>
                   </button>
                 </div>
               </>
             )}
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </>

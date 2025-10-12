@@ -142,6 +142,83 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
   const [isApproving, setIsApproving] = useState(false);
   const [approveProgress, setApproveProgress] = useState<string>('Approving edited image...');
 
+  // 🚀 Recently-approved originals registry (2-minute TTL) to force nuclear busting
+  const recentlyApprovedRef = useRef<Map<string, number>>(new Map());
+  const APPROVED_TTL_MS = 2 * 60 * 1000;
+
+  const recordRecentlyApproved = useCallback((imageFilename: string) => {
+    try {
+      const now = Date.now();
+      recentlyApprovedRef.current.set(imageFilename, now);
+      // Also persist briefly so a quick posts refresh still respects busting
+      const key = `${platform}:${username}:approved_originals`;
+      const list = JSON.parse(localStorage.getItem(key) || '[]') as Array<{f:string,t:number}>;
+      const updated = [...list.filter(x => now - x.t < APPROVED_TTL_MS && x.f !== imageFilename), { f: imageFilename, t: now }];
+      localStorage.setItem(key, JSON.stringify(updated));
+    } catch {}
+  }, [platform, username]);
+
+  const hydrateRecentlyApproved = useCallback(() => {
+    try {
+      const key = `${platform}:${username}:approved_originals`;
+      const list = JSON.parse(localStorage.getItem(key) || '[]') as Array<{f:string,t:number}>;
+      const now = Date.now();
+      for (const it of list) {
+        if (now - it.t < APPROVED_TTL_MS) {
+          recentlyApprovedRef.current.set(it.f, it.t);
+        }
+      }
+      // Cleanup expired
+      const cleaned = list.filter(x => now - x.t < APPROVED_TTL_MS);
+      localStorage.setItem(key, JSON.stringify(cleaned));
+    } catch {}
+  }, [platform, username]);
+
+  useEffect(() => {
+    hydrateRecentlyApproved();
+    // periodic cleanup
+    const id = setInterval(() => {
+      try {
+        const now = Date.now();
+        for (const [k, t] of Array.from(recentlyApprovedRef.current.entries())) {
+          if (now - t >= APPROVED_TTL_MS) recentlyApprovedRef.current.delete(k);
+        }
+      } catch {}
+    }, 30000);
+    return () => clearInterval(id);
+  }, [hydrateRecentlyApproved]);
+
+  const isRecentlyApproved = useCallback((imageFilename: string): boolean => {
+    try {
+      const t = recentlyApprovedRef.current.get(imageFilename);
+      if (!t) return false;
+      return (Date.now() - t) < APPROVED_TTL_MS;
+    } catch { return false; }
+  }, []);
+
+  const extractImageKeyFromUrl = useCallback((url: string): string | null => {
+    try {
+      const u = new URL(url, window.location.origin);
+      const m = u.pathname.match(/\/api\/r2-image\/.+\/(.+)$/);
+      return m && m[1] ? decodeURIComponent(m[1]) : null;
+    } catch { return null; }
+  }, []);
+
+  const purgeServiceWorkerForImage = useCallback((urlOrImageKey: string) => {
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        const payload: any = { type: 'PURGE_R2_IMAGE' };
+        if (urlOrImageKey.startsWith('http')) {
+          payload.url = urlOrImageKey;
+        } else {
+          payload.username = username;
+          payload.imageKey = urlOrImageKey;
+        }
+        navigator.serviceWorker.controller.postMessage(payload);
+      }
+    } catch {}
+  }, [username]);
+
   // Handle scroll events to show/hide scroll-to-top button
   const handleScroll = () => {
     if (scrollContainerRef.current) {
@@ -511,25 +588,25 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     // 🎯 PRIORITY CHECK: Look for edited image URLs first (highest priority)
     if (post.data?.image_url && post.data.image_url.includes('edited_')) {
       console.log(`[ImageURL] 🎯 Found edited image URL in post data: ${post.data.image_url}`);
-      // 🔧 FIX 1: Use content-based versioning instead of timestamp for edited images
-      const timestamp = `&edited=true&v=${imageRefreshKey.current}`;
-      return post.data.image_url + timestamp;
+      // Ensure server bypasses caches for edited assets
+      const flags = `&edited=true&v=${imageRefreshKey.current}&nuclear=${Date.now()}&bypass=1&nocache=1`;
+      return post.data.image_url + flags;
     }
     
     if (post.data?.r2_image_url && post.data.r2_image_url.includes('edited_')) {
       console.log(`[ImageURL] 🎯 Found edited R2 image URL in post data: ${post.data.r2_image_url}`);
-      // 🔧 FIX 1: Use content-based versioning instead of timestamp for edited images
-      const timestamp = `&edited=true&v=${imageRefreshKey.current}`;
-      return post.data.r2_image_url + timestamp;
+      // Ensure server bypasses caches for edited assets
+      const flags = `&edited=true&v=${imageRefreshKey.current}&nuclear=${Date.now()}&bypass=1&nocache=1`;
+      return post.data.r2_image_url + flags;
     }
     
     // 🔥 SECONDARY CHECK: Look for any edited_* filename in existing URLs and use that directly
     const existingImageUrl = post.data?.image_url || post.data?.r2_image_url || '';
     if (existingImageUrl.includes('/edited_')) {
       console.log(`[ImageURL] 🎯 Found edited filename in existing URL: ${existingImageUrl}`);
-      // 🔧 FIX 1: Use content-based versioning instead of timestamp for edited images
-      const timestamp = `&edited=true&v=${imageRefreshKey.current}`;
-      return existingImageUrl + timestamp;
+      // Ensure server bypasses caches for edited assets
+      const flags = `&edited=true&v=${imageRefreshKey.current}&nuclear=${Date.now()}&bypass=1&nocache=1`;
+      return existingImageUrl + flags;
     }
     
     // 🔍 INTELLIGENT PATTERN DETECTION: Handle multiple file naming patterns
@@ -592,8 +669,8 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         const editedFilename = `edited_campaign_ready_post_${campaignId}.${imageExtension}`;
         const editedUrl = `${API_BASE_URL}/api/r2-image/${username}/${editedFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}&edited=true`;
         
-        // 🔧 FIX 2: Use content-based versioning for edited images to enable caching
-        const editedUrlWithCacheBust = `${editedUrl}&edited=true&v=${imageRefreshKey.current}`;
+        // 🔧 Use aggressive cache-busting for edited campaign images
+        const editedUrlWithCacheBust = `${editedUrl}&edited=true&v=${imageRefreshKey.current}&nuclear=${Date.now()}&bypass=1&nocache=1`;
         
         // 🔧 CONSISTENT DISPLAY FIX: Prefer edited path only when existing URL already points to it (pre-approval preview)
         if (
@@ -662,7 +739,13 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
     const timestamp = forceRefresh ? `&t=${Date.now()}` : '';
 
     // 🎯 FIXED: Use the R2 image endpoint to avoid CORS issues
-    const reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}${timestamp}`;
+    let reliableUrl = `${API_BASE_URL}/api/r2-image/${username}/${imageFilename}?platform=${platform}&v=${imageRefreshKey.current}&post=${encodeURIComponent(postKey)}${timestamp}`;
+
+    // CRITICAL: If this post has just been edited/approved or we explicitly force refresh,
+    // append nuclear cache-busting flags so server bypasses 304 and SW purges path variants.
+    if ((post?.data?.isEdited === true) || forceRefresh || isRecentlyApproved(imageFilename)) {
+      reliableUrl += `&nuclear=${Date.now()}&bypass=1&nocache=1`;
+    }
     
     console.log(`[ImageURL] Final URL: ${reliableUrl}`);
     return reliableUrl;
@@ -1421,20 +1504,17 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
         setShowComparisonModal(false);
         setComparisonData(null);
         
-        // Immediate UI refresh: bump refresh key and broadcast update
+        // Immediate UI refresh: bump refresh key (do not broadcast edited_ event on approval)
         try { imageRefreshKey.current = Date.now(); } catch {}
-        window.dispatchEvent(new CustomEvent('postUpdated', {
-          detail: {
-            postKey: comparisonData.postKey,
-            platform,
-            imageKey: comparisonData.imageKey,
-            serverTimestamp: Date.now()
-          }
-        }));
 
         // 🔥 Ultra-fast UX: swap the tile's URL to the server-returned cache-busted original URL
         if (response.imageUrl) {
-          const now = Date.now();
+          // Record approved original for short-term nuclear busting and SW purge
+          const approvedKey = extractImageKeyFromUrl(response.imageUrl);
+          if (approvedKey) {
+            recordRecentlyApproved(approvedKey);
+            purgeServiceWorkerForImage(approvedKey);
+          }
           setLocalPosts(prev => {
             const updated = [...prev];
             const idx = updated.findIndex(p => p.key === (comparisonData?.postKey || ''));

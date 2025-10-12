@@ -1,0 +1,272 @@
+/**
+ * AI Manager Proactive Notification Styles
+ * Beautiful, warm, and inviting notification design
+ */
+
+.ai-manager-notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2147483646; /* Just below AI Manager chat */
+  pointer-events: auto;
+  max-width: 450px;
+}
+
+.ai-notification-card {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 255, 204, 0.15) 0%,
+    rgba(138, 43, 226, 0.15) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 2px solid rgba(0, 255, 204, 0.3);
+  border-radius: 20px;
+  padding: 20px 24px;
+  box-shadow: 
+    0 10px 40px rgba(0, 255, 204, 0.2),
+    0 0 60px rgba(138, 43, 226, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.ai-notification-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 
+    0 15px 50px rgba(0, 255, 204, 0.3),
+    0 0 80px rgba(138, 43, 226, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-color: rgba(0, 255, 204, 0.5);
+}
+
+.ai-notification-card:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* Animated sparkle decoration */
+.ai-notification-sparkle {
+  position: absolute;
+  top: 12px;
+  right: 50px;
+  color: #00ffcc;
+  opacity: 0.6;
+  filter: drop-shadow(0 0 8px rgba(0, 255, 204, 0.6));
+}
+
+/* AI Robot Avatar */
+.ai-notification-avatar {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #00ffcc 0%, #8a2be2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a0a0f;
+  box-shadow: 
+    0 4px 12px rgba(0, 255, 204, 0.4),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+  position: relative;
+}
+
+.ai-notification-avatar::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: linear-gradient(135deg, #00ffcc 0%, #8a2be2 100%);
+  border-radius: 50%;
+  z-index: -1;
+  opacity: 0.3;
+  filter: blur(8px);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+/* Content */
+.ai-notification-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-notification-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.ai-notification-title {
+  font-size: 16px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #00ffcc 0%, #8a2be2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 0.5px;
+}
+
+.ai-notification-badge {
+  background: linear-gradient(135deg, #00ffcc 0%, #8a2be2 100%);
+  color: #0a0a0f;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0, 255, 204, 0.3);
+}
+
+.ai-notification-message {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  font-weight: 400;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.ai-notification-cta {
+  margin-top: 4px;
+}
+
+.ai-notification-cta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #00ffcc;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.ai-notification-card:hover .ai-notification-cta span {
+  color: #fff;
+  text-shadow: 0 0 10px rgba(0, 255, 204, 0.6);
+}
+
+/* Dismiss Button */
+.ai-notification-dismiss {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+  transition: all 0.2s ease;
+  padding: 0;
+  z-index: 10;
+}
+
+.ai-notification-dismiss:hover {
+  background: rgba(255, 77, 77, 0.3);
+  border-color: rgba(255, 77, 77, 0.5);
+  color: #fff;
+  transform: scale(1.1);
+}
+
+.ai-notification-dismiss:active {
+  transform: scale(0.95);
+}
+
+/* Animated border glow */
+.ai-notification-glow {
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 255, 204, 0.3),
+    rgba(138, 43, 226, 0.3)
+  );
+  border-radius: 20px;
+  filter: blur(10px);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .ai-manager-notification-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+
+  .ai-notification-card {
+    padding: 16px 20px;
+  }
+
+  .ai-notification-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .ai-notification-message {
+    font-size: 13px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .ai-notification-card {
+    background: linear-gradient(
+      135deg,
+      rgba(0, 255, 204, 0.12) 0%,
+      rgba(138, 43, 226, 0.12) 100%
+    );
+  }
+}
+
+/* Animation for entrance */
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Accessibility */
+.ai-notification-card:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 4px;
+}
+
+.ai-notification-dismiss:focus-visible {
+  outline: 2px solid #00ffcc;
+  outline-offset: 2px;
+}

@@ -1,0 +1,114 @@
+
+═══════════════════════════════════════════════════════════
+🔥 BRUTAL AI MANAGER STRESS TEST - NO SUGAR COATING
+═══════════════════════════════════════════════════════════
+
+
+📋 TEST 1: Backend Server Health Check
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Backend Health
+✅ Backend Health: PASS
+   All servers online
+
+
+📋 TEST 2: Detect Acquired Platform (Instagram)
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Instagram Status Check
+✅ Acquired Platform Detection: PASS
+   Detected Instagram username: @narsissist
+
+
+📋 TEST 3: Detect Unacquired Platform (LinkedIn)
+─────────────────────────────────────
+
+🔍 Monitoring backend for: LinkedIn Status Check
+⚠️ Unacquired Platform Detection: WARN
+   LinkedIn appears acquired - test may need update
+
+
+📋 TEST 4: News Summary (R2 File Retrieval + AI)
+─────────────────────────────────────
+
+🔍 Monitoring backend for: News Summary
+✅ News Summary - Real Data: PASS
+   Retrieved 1 news items from R2, AI summary: 📰 **Trending News on INSTAGRAM**
+
+Here's a snapshot of today's trending business and beauty news:
+
+...
+
+
+📋 TEST 5: Analytics (Profile Info from R2)
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Profile Analytics
+✅ Analytics - Real Data: PASS
+   Followers: 4, Posts: 24
+
+
+📋 TEST 6: Competitor Analysis (Cached Profiles)
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Competitor Analysis
+⚠️ Competitor Analysis - Missing Cache: WARN
+   Competitor profiles not cached - expected for initial run
+
+
+📋 TEST 7: Create Post from Trending News
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Post Creation
+✅ Post Creation - Trending News: PASS
+   Post created: The rapid advancements in AI continue to capture global atte...
+
+
+📋 TEST 8: Create Custom Post (AI + ChromaDB)
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Custom Post
+✅ Post Creation - Custom Query: PASS
+   AI-generated post with ChromaDB context
+
+
+📋 TEST 9: Strategy Recommendations (R2 Files)
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Strategies
+✅ Strategy Retrieval: PASS
+   Retrieved 1 strategies from R2
+
+
+📋 TEST 10: Cross-Platform Username Isolation
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Instagram Username
+
+🔍 Monitoring backend for: Twitter Username
+✅ Cross-Platform Isolation: PASS
+   Instagram: @narsissist, Twitter: @Jack (different as expected)
+
+
+📋 TEST 11: Post Creation on Unacquired Platform
+─────────────────────────────────────
+
+🔍 Monitoring backend for: Unacquired Platform Post
+✅ Unacquired Platform Handling: PASS
+   Correctly rejected post creation on unacquired platform
+
+
+
+═══════════════════════════════════════════════════════════
+📊 BRUTAL TEST RESULTS - FINAL VERDICT
+═══════════════════════════════════════════════════════════
+
+✅ PASSED: 9
+❌ FAILED: 0
+⚠️  WARNINGS: 2
+
+📈 Success Rate: 100.0%
+
+
+═══════════════════════════════════════════════════════════
+

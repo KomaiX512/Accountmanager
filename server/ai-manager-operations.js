@@ -203,13 +203,9 @@ export async function analyzeCompetitor(userId, platform, competitorUsername, pr
     console.log(`\n[AI-Manager] ===== COMPETITOR ANALYSIS START =====`);
     console.log(`[AI-Manager] UserId: ${userId}, Platform: ${platform}, Competitor: ${competitorUsername}`);
     
-    // Step 1: Get user's username from R2
+    // Step 1: Get user's username from R2 (single source of truth)
     progressCallback(`🔍 Step 1/4: Retrieving your ${platform} username...`);
-    let myUsername = providedUsername;
-    
-    if (!myUsername) {
-      myUsername = await getUsernameForPlatform(userId, platform, progressCallback);
-    }
+    const myUsername = await getUsernameForPlatform(userId, platform, progressCallback);
     
     console.log(`[AI-Manager] My username: @${myUsername}`);
     
@@ -294,13 +290,9 @@ export async function getNewsSummary(userId, platform, progressCallback, provide
     console.log(`\n[AI-Manager] ===== NEWS SUMMARY START =====`);
     console.log(`[AI-Manager] UserId: ${userId}, Platform: ${platform}`);
     
-    // Step 1: Get username from R2
+    // Step 1: Get username from R2 (single source of truth)
     progressCallback(`🔍 Step 1/3: Retrieving your ${platform} username...`);
-    let username = providedUsername;
-    
-    if (!username) {
-      username = await getUsernameForPlatform(userId, platform, progressCallback);
-    }
+    const username = await getUsernameForPlatform(userId, platform, progressCallback);
     
     console.log(`[AI-Manager] Username: @${username}`);
     
@@ -364,13 +356,9 @@ export async function getCompetitorAnalysis(userId, platform, progressCallback, 
     console.log(`\n[AI-Manager] ===== COMPETITOR ANALYSIS START =====`);
     console.log(`[AI-Manager] UserId: ${userId}, Platform: ${platform}`);
     
-    // Step 1: Get username from R2
+    // Step 1: Get username from R2 (single source of truth)
     progressCallback(`🔍 Step 1/4: Retrieving your ${platform} username...`);
-    let username = providedUsername;
-    
-    if (!username) {
-      username = await getUsernameForPlatform(userId, platform, progressCallback);
-    }
+    const username = await getUsernameForPlatform(userId, platform, progressCallback);
     
     console.log(`[AI-Manager] Username: @${username}`);
     

@@ -8,61 +8,84 @@ import { getApiUrl } from '../../config/api';
 import axios from 'axios';
 
 export class OperationExecutor {
+  // Cache platform status to avoid duplicate API calls
+  private platformStatusCache: Map<string, { username: string | null; connected: boolean; timestamp: number }> = new Map();
+  private readonly CACHE_TTL = 30000; // 30 seconds
+
   /**
-   * Check if platform is connected/acquired
+   * CRITICAL: Fetch platform status (username + connection state) from backend R2
+   * This is the ONLY source of truth for platform usernames
+   * Caches results for 30 seconds to avoid duplicate API calls
    */
-  private async isPlatformConnected(platform: string, userId: string): Promise<boolean> {
+  private async getPlatformStatus(platform: string, userId: string): Promise<{ username: string | null; connected: boolean }> {
+    const cacheKey = `${platform}_${userId}`;
+    const cached = this.platformStatusCache.get(cacheKey);
+    
+    // Return cached result if fresh (< 30 seconds old)
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      console.log(`📦 [Platform Status] Using cached ${platform} status: connected=${cached.connected}, username=${cached.username}`);
+      return { username: cached.username, connected: cached.connected };
+    }
+
     try {
-      console.log(`🔍 [Platform Check] Checking ${platform} for user ${userId}`);
+      console.log(`🔍 [Platform Status] Fetching ${platform} status for ${userId} from backend R2...`);
       
-      // Check localStorage first (instant UX)
-      const localCheck = localStorage.getItem(`${platform}_accessed_${userId}`);
-      console.log(`📂 [Platform Check] localStorage ${platform}_accessed_${userId}:`, localCheck);
+      const statusResp = await axios.get(
+        getApiUrl(`/api/user-${platform}-status/${userId}`),
+        { timeout: 5000, validateStatus: () => true }
+      );
       
-      if (localCheck === 'true') {
-        const username = localStorage.getItem(`${platform}_username_${userId}`);
-        console.log(`✅ [Platform Check] Found in localStorage, username:`, username);
-        return !!username;
-      }
-
-      // FALLBACK: Check if accountHolder exists (user connected via dashboard)
-      const accountHolder = localStorage.getItem('accountHolder');
-      const platformUsername = localStorage.getItem(`${platform}Username`); // Some platforms use this format
-      console.log(`📂 [Platform Check] Fallback - accountHolder:`, accountHolder, `${platform}Username:`, platformUsername);
-      
-      if (accountHolder || platformUsername) {
-        console.log(`✅ [Platform Check] Found via fallback (dashboard connection)`);
-        // Update localStorage for next time
-        localStorage.setItem(`${platform}_accessed_${userId}`, 'true');
-        if (accountHolder) localStorage.setItem(`${platform}_username_${userId}`, accountHolder);
-        return true;
-      }
-
-      // Check backend with timeout and validateStatus
-      console.log(`🌐 [Platform Check] Checking backend API...`);
-      const statusEndpoint = `/api/user-${platform}-status/${userId}`;
-      const response = await axios.get(getApiUrl(statusEndpoint), {
-        timeout: 5000,
-        validateStatus: () => true
-      });
-      
-      if (response.status >= 200 && response.status < 300) {
-        const data = response.data || {};
+      if (statusResp.status >= 200 && statusResp.status < 300 && statusResp.data) {
+        const data = statusResp.data;
         const hasEnteredKey = platform === 'twitter' ? 'hasEnteredTwitterUsername'
           : platform === 'facebook' ? 'hasEnteredFacebookUsername'
           : platform === 'linkedin' ? 'hasEnteredLinkedInUsername'
           : 'hasEnteredInstagramUsername';
+        
         const connected = Boolean(data[hasEnteredKey]);
-        console.log(`${connected ? '✅' : '❌'} [Platform Check] Backend says:`, connected);
-        return connected;
+        const username = data[`${platform}_username`] || null;
+        
+        // Cache the result
+        this.platformStatusCache.set(cacheKey, { username, connected, timestamp: Date.now() });
+        // Keep localStorage in sync with backend source of truth
+        try {
+          if (username) {
+            localStorage.setItem(`${platform}_username_${userId}`, username);
+          }
+        } catch {}
+        
+        console.log(`✅ [Platform Status] ${platform}: connected=${connected}, username=${username || 'N/A'}`);
+        return { username, connected };
       }
       
-      console.log(`❌ [Platform Check] All checks failed`);
-      return false;
-    } catch (error) {
-      console.error(`❌ [Platform Check] Error:`, error);
-      return false;
+      console.log(`❌ [Platform Status] Backend returned ${statusResp.status} for ${platform}`);
+      const result = { username: null, connected: false };
+      this.platformStatusCache.set(cacheKey, { ...result, timestamp: Date.now() });
+      return result;
+    } catch (error: any) {
+      console.error(`❌ [Platform Status] Error fetching ${platform} status:`, error.message);
+      const result = { username: null, connected: false };
+      this.platformStatusCache.set(cacheKey, { ...result, timestamp: Date.now() });
+      return result;
     }
+  }
+
+  /**
+   * Get platform-specific username from backend R2 (uses cached status)
+   */
+  private async getPlatformUsername(platform: string, userId: string): Promise<string | null> {
+    const status = await this.getPlatformStatus(platform, userId);
+    return status.username;
+  }
+
+
+  /**
+   * Check if platform is connected/acquired
+   * CRITICAL: Uses cached platform status to avoid duplicate API calls
+   */
+  private async isPlatformConnected(platform: string, userId: string): Promise<boolean> {
+    const status = await this.getPlatformStatus(platform, userId);
+    return status.connected;
   }
 
   /**
@@ -253,32 +276,96 @@ export class OperationExecutor {
   /**
    * PLATFORM OPERATIONS
    */
+  /**
+   * ACQUIRE PLATFORM - Real implementation with validation
+   * 
+   * Requirements per platform:
+   * - Instagram: username + 3 competitors
+   * - Twitter: username + 3 competitors  
+   * - Facebook: username + profileURL + 3 competitors (with URLs)
+   * - LinkedIn: username + profileURL + 3 competitors (with URLs)
+   */
   private async acquirePlatform(params: any, context: OperationContext): Promise<OperationResult> {
     try {
-      const { platform, username, competitors, accountType, postingStyle } = params;
+      const { platform, username, profileURL, competitors } = params;
+
+      if (!platform) {
+        return { success: false, message: '❌ Platform is required. Specify: instagram, twitter, facebook, or linkedin' };
+      }
+
+      // STEP 1: Check if platform is ALREADY acquired
+      console.log(`🔍 Checking if ${platform} is already acquired for user ${context.userId}...`);
+      const statusEndpoint = `/api/user-${platform}-status/${context.userId}`;
+      const statusResp = await axios.get(getApiUrl(statusEndpoint), { 
+        timeout: 5000, 
+        validateStatus: () => true 
+      });
+
+      if (statusResp.status === 200 && statusResp.data) {
+        const hasEnteredKey = platform === 'twitter' ? 'hasEnteredTwitterUsername'
+          : platform === 'facebook' ? 'hasEnteredFacebookUsername'
+          : platform === 'linkedin' ? 'hasEnteredLinkedInUsername'
+          : 'hasEnteredInstagramUsername';
+        
+        const existingUsername = statusResp.data[`${platform}_username`];
+        
+        if (statusResp.data[hasEnteredKey] === true && existingUsername) {
+          return {
+            success: false,
+            message: `❌ ${platform.charAt(0).toUpperCase() + platform.slice(1)} is already acquired as @${existingUsername}.\n\nTo re-acquire, you must first reset it in Settings, then try again.`
+          };
+        }
+      }
+
+      // STEP 2: Validate platform-specific requirements
+      const validation = this.validatePlatformRequirements(platform, params);
+      if (!validation.valid) {
+        return {
+          success: false,
+          message: validation.message!
+        };
+      }
+
+      // STEP 3: Submit to backend R2
+      console.log(`✅ All requirements met. Acquiring ${platform} as @${username}...`);
+      
+      // Update R2 status
+      const updateResp = await axios.post(
+        getApiUrl(`/api/user-${platform}-status/${context.userId}`),
+        { [`${platform}_username`]: username },
+        { timeout: 10000, validateStatus: () => true }
+      );
+
+      if (updateResp.status < 200 || updateResp.status >= 300) {
+        return {
+          success: false,
+          message: `❌ Failed to update ${platform} status: ${updateResp.data?.error || 'Unknown error'}`
+        };
+      }
 
       // Store account info in localStorage
       localStorage.setItem('accountHolder', username);
       localStorage.setItem(`${platform}_username_${context.userId}`, username);
-      localStorage.setItem(`${platform}_accountType`, accountType || 'business');
+      localStorage.setItem(`${platform}_accountType`, params.accountType || 'business');
       
-      if (postingStyle) {
-        localStorage.setItem(`${platform}_postingStyle`, postingStyle);
+      if (params.postingStyle) {
+        localStorage.setItem(`${platform}_postingStyle`, params.postingStyle);
       }
 
       // Store competitors (WITH userId for consistency)
       if (competitors && Array.isArray(competitors)) {
         localStorage.setItem(`${platform}_competitors_${context.userId}`, JSON.stringify(competitors));
-        localStorage.setItem(`${platform}_competitors`, JSON.stringify(competitors)); // Backward compat
+        localStorage.setItem(`${platform}_competitors`, JSON.stringify(competitors));
       }
 
       // Call backend account info endpoint
       await axios.post(getApiUrl('/api/save-account-info'), {
         username,
-        accountType: accountType || 'business',
-        postingStyle: postingStyle || 'professional',
+        accountType: params.accountType || 'business',
+        postingStyle: params.postingStyle || 'professional',
         competitors,
-        platform
+        platform,
+        profileURL: profileURL || null
       }, {
         headers: { 'Content-Type': 'application/json' },
         timeout: 30000
@@ -294,25 +381,97 @@ export class OperationExecutor {
 
       return {
         success: true,
-        message: `🚀 Acquiring ${platform} account @${username}. This will take approximately 15 minutes. You'll be notified when processing completes.`,
+        message: `🚀 Successfully acquiring ${platform} account @${username}.\n\nProcessing started - this will take approximately 15 minutes.\n\nYou'll be notified when complete.`,
         data: { 
           platform, 
           username, 
           processingStarted: true,
           estimatedTime: '15 minutes'
-        },
-        nextSteps: [
-          'Monitor processing status on the screen',
-          'Wait for completion notification',
-          'Dashboard will load automatically when ready'
-        ]
+        }
       };
     } catch (error: any) {
+      console.error('❌ Platform acquisition failed:', error);
       return {
         success: false,
-        message: `Failed to acquire platform: ${error.message}`
+        message: `❌ Failed to acquire platform: ${error.response?.data?.error || error.message}`
       };
     }
+  }
+
+  /**
+   * Validate platform-specific requirements
+   */
+  private validatePlatformRequirements(platform: string, params: any): { valid: boolean; message?: string } {
+    const { username, profileURL, competitors } = params;
+
+    // Username is ALWAYS required
+    if (!username || !username.trim()) {
+      return {
+        valid: false,
+        message: `❌ Username is required for ${platform}.\n\nPlease provide your ${platform} username.`
+      };
+    }
+
+    // Platform-specific validation
+    switch (platform.toLowerCase()) {
+      case 'facebook':
+      case 'linkedin':
+        // Facebook and LinkedIn require profile URL
+        if (!profileURL || !profileURL.trim()) {
+          return {
+            valid: false,
+            message: `❌ ${platform.charAt(0).toUpperCase() + platform.slice(1)} requires a profile URL.\n\nREQUIREMENTS:\n- Username: ${username} ✅\n- Profile URL: ❌ MISSING\n- 3 Competitors with URLs: ${competitors?.length || 0}/3\n\nPlease provide your ${platform} profile URL.`
+          };
+        }
+
+        // Validate URL format
+        if (!profileURL.startsWith('http://') && !profileURL.startsWith('https://')) {
+          return {
+            valid: false,
+            message: `❌ Invalid profile URL format.\n\nExpected: https://www.${platform}.com/...\nReceived: ${profileURL}\n\nPlease provide a complete URL starting with https://`
+          };
+        }
+
+        // Competitors validation for Facebook/LinkedIn (need URLs)
+        if (!competitors || !Array.isArray(competitors) || competitors.length < 3) {
+          return {
+            valid: false,
+            message: `❌ ${platform.charAt(0).toUpperCase() + platform.slice(1)} requires 3 competitor profiles with URLs.\n\nREQUIREMENTS:\n- Username: ${username} ✅\n- Profile URL: ${profileURL} ✅\n- Competitors: ${competitors?.length || 0}/3 ❌\n\nPlease provide 3 competitor profile URLs.`
+          };
+        }
+
+        // Validate each competitor has URL
+        for (let i = 0; i < competitors.length; i++) {
+          const comp = competitors[i];
+          if (typeof comp === 'object' && !comp.url) {
+            return {
+              valid: false,
+              message: `❌ Competitor ${i + 1} is missing a URL.\n\nAll competitors for ${platform} must have profile URLs.`
+            };
+          }
+        }
+        break;
+
+      case 'instagram':
+      case 'twitter':
+        // Instagram and Twitter only need competitor usernames
+        if (!competitors || !Array.isArray(competitors) || competitors.length < 3) {
+          return {
+            valid: false,
+            message: `❌ ${platform.charAt(0).toUpperCase() + platform.slice(1)} requires 3 competitors.\n\nREQUIREMENTS:\n- Username: ${username} ✅\n- Competitors: ${competitors?.length || 0}/3 ❌\n\nPlease provide 3 competitor usernames.`
+          };
+        }
+        break;
+
+      default:
+        return {
+          valid: false,
+          message: `❌ Unknown platform: ${platform}\n\nSupported platforms: instagram, twitter, facebook, linkedin`
+        };
+    }
+
+    // All validations passed
+    return { valid: true };
   }
 
   private async checkPlatformStatus(params: any, context: OperationContext): Promise<OperationResult> {
@@ -471,12 +630,9 @@ export class OperationExecutor {
         };
       }
 
-      // CRITICAL: Get username from localStorage (most reliable source)
-      console.log(`📂 [CreatePost] Opening ${targetPlatform} account files...`);
-      const username = localStorage.getItem(`${targetPlatform}_username_${context.userId}`) || 
-                       localStorage.getItem('accountHolder');
-      
-      console.log(`✅ [CreatePost] Found ${targetPlatform} username: @${username}`);
+      console.log(`📂 [CreatePost] Resolving ${targetPlatform} username from backend...`);
+      const username = await this.getPlatformUsername(targetPlatform, context.userId);
+      console.log(`✅ [CreatePost] Using ${targetPlatform} username: @${username}`);
 
       if (!username) {
         return {
@@ -553,10 +709,9 @@ export class OperationExecutor {
       const { platform, newsIndex, customization } = params;
       const targetPlatform = platform || context.platform || 'twitter';
 
-      // Step 1: Get username from localStorage (most reliable, no network call needed)
-      console.log(`📂 [CreatePostFromNews] Opening ${targetPlatform} account files...`);
-      const username = localStorage.getItem(`${targetPlatform}_username_${context.userId}`) || 
-                       localStorage.getItem('accountHolder');
+      console.log(`📂 [CreatePostFromNews] Resolving ${targetPlatform} username from backend...`);
+      const username = await this.getPlatformUsername(targetPlatform, context.userId);
+      console.log(`✅ [CreatePostFromNews] Found ${targetPlatform} username: @${username}`);
 
       if (!username) {
         return {
@@ -564,8 +719,6 @@ export class OperationExecutor {
           message: `❌ No ${targetPlatform} account connected. Please connect your account first.`
         };
       }
-
-      console.log(`✅ [CreatePostFromNews] Found ${targetPlatform} username: @${username}`);
 
       // Step 2: Fetch trending news
       const newsResponse = await axios.get(
@@ -669,10 +822,12 @@ export class OperationExecutor {
       const scheduleDate = this.parseScheduleTime(scheduledTime);
 
       // Call scheduling endpoint (requires userId in path)
+      const resolvedPlatform = platform || context.platform;
+      const resolvedUsername = resolvedPlatform ? await this.getPlatformUsername(resolvedPlatform, context.userId) : undefined;
       await axios.post(getApiUrl(`/api/schedule-post/${context.userId}`), {
         postId,
-        platform: platform || context.platform,
-        username: context.username,
+        platform: resolvedPlatform,
+        username: resolvedUsername,
         scheduledTime: scheduleDate.toISOString()
       });
 
@@ -870,7 +1025,16 @@ export class OperationExecutor {
         };
       }
 
-      console.log(`🤖 [CompetitorAnalysis] Using AGENTIC BACKEND for ${targetPlatform}...`);
+      // CRITICAL: Fetch platform-specific username from backend (NOT localStorage)
+      const username = await this.getPlatformUsername(targetPlatform, context.userId);
+      if (!username) {
+        return {
+          success: false,
+          message: `❌ Could not retrieve ${targetPlatform} username. Please ensure the platform is properly connected.`
+        };
+      }
+
+      console.log(`🤖 [CompetitorAnalysis] Using AGENTIC BACKEND for ${targetPlatform}/@${username}...`);
 
       // If specific competitor requested, analyze just that one
       if (competitor) {
@@ -881,6 +1045,7 @@ export class OperationExecutor {
           {
             userId: context.userId,
             platform: targetPlatform,
+            username, // Pass platform-specific username from backend
             competitorUsername: competitor
           },
           { timeout: 60000, validateStatus: () => true }
@@ -921,6 +1086,7 @@ export class OperationExecutor {
         {
           userId: context.userId,
           platform: targetPlatform,
+          username, // Use platform-specific username from backend
           competitors: competitors // Pass competitors from localStorage
         },
         { timeout: 60000, validateStatus: () => true }
@@ -963,14 +1129,30 @@ export class OperationExecutor {
         };
       }
 
+      // CRITICAL: Fetch platform-specific username from backend (NOT localStorage)
+      const username = await this.getPlatformUsername(targetPlatform, context.userId);
+      if (!username) {
+        return {
+          success: false,
+          message: `❌ Could not retrieve ${targetPlatform} username. Please ensure the platform is properly connected.`
+        };
+      }
+
+      console.log(`📰 [NewsSummary] Using AGENTIC BACKEND for ${targetPlatform}/@${username}...`);
+
       // Use NEW agentic backend that reads files and summarizes with AI
       const response = await axios.post(
         getApiUrl('/api/ai-manager/news-summary'),
         {
           userId: context.userId,
-          platform: targetPlatform
+          platform: targetPlatform,
+          username // Use platform-specific username from backend
         },
-        { timeout: 30000, validateStatus: () => true }
+        { 
+          timeout: 60000, // Increased to 60s for R2 operations
+          validateStatus: () => true,
+          headers: { 'Content-Type': 'application/json' }
+        }
       );
 
       if (response.status === 200 && response.data.success) {
@@ -980,17 +1162,31 @@ export class OperationExecutor {
           data: response.data.data
         };
       } else {
+        console.error(`❌ News API returned ${response.status}:`, response.data);
         return {
           success: false,
-          message: response.data.message || 'Failed to get news summary'
+          message: response.data?.message || `Failed to get news summary (${response.status})`
         };
       }
       
     } catch (error: any) {
       console.error('❌ [AI Manager] News summary failed:', error);
+      
+      // Detailed error message
+      let errorMsg = 'Failed to fetch news';
+      if (error.code === 'ECONNABORTED') {
+        errorMsg = 'Request timeout - backend taking too long to respond';
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMsg = 'Network error - check if backend is running';
+      } else if (error.response) {
+        errorMsg = error.response.data?.message || `Server error (${error.response.status})`;
+      } else {
+        errorMsg = error.message;
+      }
+      
       return {
         success: false,
-        message: `❌ Failed to fetch news: ${error.response?.data?.message || error.message}`
+        message: `❌ ${errorMsg}`
       };
     }
   }
@@ -1004,10 +1200,8 @@ export class OperationExecutor {
 
       console.log(`📂 [Strategies] Opening ${targetPlatform} strategy files...`);
 
-      // CRITICAL: Get username from localStorage (most reliable source)
-      const username = localStorage.getItem(`${targetPlatform}_username_${context.userId}`) || 
-                       localStorage.getItem('accountHolder');
-      
+      // CRITICAL: Resolve username from backend status (source of truth)
+      const username = await this.getPlatformUsername(targetPlatform, context.userId);
       console.log(`✅ [Strategies] Found ${targetPlatform} username: @${username}`);
 
       if (!username) {

@@ -1634,12 +1634,9 @@ app.get(['/api/user/:userId/platform-activity', '/user/:userId/platform-activity
       console.log(`[${new Date().toISOString()}] [USER-API] No platform userIds found, trying direct userId lookup`);
     }
 
-    // Fallback to known platform userIds for testing
+    // If still not found, do NOT inject hardcoded test accounts; rely solely on real mappings
     if (platformUserIds.length === 0) {
       platformUserIds = [userId];
-      if (userId === 'S0Jwk1feGnOCLzw8lnmrNU7mPX72') {
-        platformUserIds.push('facebook_KomaiX512', 'instagram_fentybeauty');
-      }
     }
 
     console.log(`[${new Date().toISOString()}] [USER-API] Platform userIds for activity: [${platformUserIds.join(', ')}]`);
@@ -2064,11 +2061,7 @@ async function getUserIdFromPlatformUser(platform, username) {
     
     console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] 🔍 Looking up userId for ${normalizedPlatform}/${normalizedUsername}`);
     
-    // ✅ PRIORITY STRATEGY: Hardcoded mapping for known test users to ensure auto-sync works
-    if (normalizedPlatform === 'instagram' && normalizedUsername === 'narsissist') {
-      console.log(`[${new Date().toISOString()}] [PLATFORM-USAGE] ✅ Priority mapping: instagram/narsissist -> KUvVFxnLanYTWPuSIfphby5hxJQ2`);
-      return 'KUvVFxnLanYTWPuSIfphby5hxJQ2';
-    }
+    // Do not use any hardcoded platform/username -> userId mappings
     
     // Strategy 1: Try to find userId by searching platform connections via /api/users
     try {
@@ -4193,19 +4186,7 @@ app.post(['/api/rag/discussion', '/api/discussion'], async (req, res) => {
         }
       } else {
         // Fallback to platform/username mapping, with known hardcoded mappings as last resort
-        let userId = await getUserIdFromPlatformUser(platform, username);
-        if (!userId) {
-          const knownMappings = {
-            'twitter_gdb': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
-            'instagram_fentybeauty': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
-            'facebook_komaix512': 'KUvVFxnLanYTWPuSIfphby5hxJQ2'
-          };
-          const platformKey = `${platform}_${username}`;
-          userId = knownMappings[platformKey] || null;
-          if (userId) {
-            console.log(`[DISCUSSION] 🔧 Using hardcoded mapping: ${platformKey} -> ${userId}`);
-          }
-        }
+        const userId = await getUserIdFromPlatformUser(platform, username);
         if (userId) {
           const usageResponse = await fetch(`http://127.0.0.1:3000/api/usage/increment/${userId}`, {
             method: 'POST',
@@ -4306,25 +4287,8 @@ app.post(['/api/rag/post-generator', '/api/post-generator'], async (req, res) =>
             console.warn(`[POST-GENERATOR] ⚠️ UID-based usage increment failed with status:`, usageResponse.status);
           }
         } else {
-          // Get userId from platform/username mapping with hardcoded fallback
-          let userId = await getUserIdFromPlatformUser(platform, username);
-          
-          // HARDCODED FALLBACK: Known platform/username to userId mappings
-          if (!userId) {
-            const knownMappings = {
-              'twitter_gdb': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
-              'instagram_fentybeauty': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
-              'instagram_maccosmetics': 'KUvVFxnLanYTWPuSIfphby5hxJQ2',
-              'facebook_KomaiX512': 'KUvVFxnLanYTWPuSIfphby5hxJQ2'
-            };
-            
-            const platformKey = `${platform}_${username}`;
-            userId = knownMappings[platformKey] || null;
-            
-            if (userId) {
-              console.log(`[POST-GENERATOR] 🔧 Using hardcoded mapping: ${platformKey} -> ${userId}`);
-            }
-          }
+          // Get userId from platform/username mapping only via real mapping helper
+          const userId = await getUserIdFromPlatformUser(platform, username);
           
           if (userId) {
             console.log(`[POST-GENERATOR] 🔍 Found userId ${userId} for ${platform}/${username}, incrementing usage`);
@@ -4362,15 +4326,9 @@ app.get(['/ai-replies/:username', '/api/ai-replies/:username'], async (req, res)
   setCorsHeaders(res, req.headers.origin || '*');
   const { username } = req.params;
   const platform = req.query.platform || 'instagram';
-  // Apply alias map so legacy usernames resolve to primary data
-  const aliasMap = {
-    instagram: {
-      narsissist: 'maccosmetics',
-    }
-  };
   const normalizedPlatform = String(platform || '').toLowerCase();
   const normalizedUsername = String(username || '').toLowerCase();
-  const effectiveUsername = aliasMap[normalizedPlatform]?.[normalizedUsername] || username;
+  const effectiveUsername = normalizedUsername || username;
   
   console.log(`[${new Date().toISOString()}] [AI-REPLIES] Fetching AI replies for ${platform}/${effectiveUsername}`);
   
@@ -19092,11 +19050,8 @@ app.get(['/api/avatar/:platform/:username', '/api/avatar/:username'], async (req
     const refresh = req.query.refresh || req.query.t || req.query.v;
     const AVATAR_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
-    // Minimal alias mapping to unify data lookups
-    const aliasMap = {
-      instagram: { narsissist: 'maccosmetics' }
-    };
-    const effectiveUsername = aliasMap[platform]?.[normalizedUsername] || normalizedUsername;
+    // Use exactly the normalized username; do not alias to other accounts
+    const effectiveUsername = normalizedUsername;
     const r2Key = `avatars/${platform}/${effectiveUsername}.jpg`;
     const cacheKey = `${platform}:${effectiveUsername}`;
     
@@ -19398,17 +19353,13 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
     const variantEtag = '"v1-' + crypto.createHash('md5').update(variantSig).digest('hex') + '"';
 
     const ifNoneMatch = req.headers['if-none-match'];
-    if (ifNoneMatch && ifNoneMatch === variantEtag) {
-      // Respect cache-busting flags even on 304
-      if (req.query.nuclear || req.query.immediate || req.query.final || req.query.preload || req.query.emergency || req.query.bypass || req.query.fresh || req.query.destroy) {
-        res.set({
-          'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0, private, proxy-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': 'Thu, 01 Jan 1970 00:00:00 GMT'
-        });
-      } else {
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-      }
+    const hasBustFlag = (
+      req.query.nuclear || req.query.immediate || req.query.final || req.query.preload ||
+      req.query.emergency || req.query.bypass || req.query.fresh || req.query.destroy
+    );
+    // IMPORTANT: If cache-busting flags are present, bypass 304 to force fresh body
+    if (ifNoneMatch && ifNoneMatch === variantEtag && !hasBustFlag) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
       res.setHeader('ETag', variantEtag);
       return res.status(304).end();
     }
@@ -19432,14 +19383,21 @@ app.get('/api/r2-image/:username/:imageKey', netflixOptimizer.cacheMiddleware(36
     const requestOriginal = String(req.query.quality || '').toLowerCase() === 'original' || String(req.query.original || '') === '1' || String(req.query.original || '').toLowerCase() === 'true';
     const isRenderRequest = String(req.query.render || '') === '1' || String(req.query.render || '').toLowerCase() === 'true';
 
-    // Detect content type from file extension (fallback)
-    let contentType = 'image/jpeg';
-    if (imageKey.endsWith('.png')) {
-      contentType = 'image/png';
-    } else if (imageKey.endsWith('.webp')) {
-      contentType = 'image/webp';
-    } else if (imageKey.endsWith('.gif')) {
-      contentType = 'image/gif';
+    // Prefer R2 object's ContentType; fall back to extension when unspecified or generic
+    let contentType = (response && response.ContentType) ? String(response.ContentType) : '';
+    if (!contentType || contentType === 'binary/octet-stream' || contentType === 'application/octet-stream') {
+      // Detect from file extension (fallback)
+      if (imageKey.endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (imageKey.endsWith('.webp')) {
+        contentType = 'image/webp';
+      } else if (imageKey.endsWith('.gif')) {
+        contentType = 'image/gif';
+      } else if (imageKey.endsWith('.jpeg') || imageKey.endsWith('.jpg')) {
+        contentType = 'image/jpeg';
+      } else {
+        contentType = 'image/jpeg';
+      }
     }
 
     // Apply Sharp transforms when available and requested (skip if original requested)
@@ -19679,7 +19637,8 @@ app.post('/api/ai-manager/competitor-analysis', async (req, res) => {
     console.log(`[AI-Manager] Progress: ${message}`);
   };
   
-  const result = await getCompetitorAnalysis(userId, platform, progressCallback, username, competitors);
+  // Always resolve username from R2 inside the operation (do not trust provided username)
+  const result = await getCompetitorAnalysis(userId, platform, progressCallback, null, competitors);
   return res.json(result);
 });
 
@@ -19702,7 +19661,8 @@ app.post('/api/ai-manager/news-summary', async (req, res) => {
     console.log(`[AI-Manager] Progress: ${message}`);
   };
   
-  const result = await getNewsSummary(userId, platform, progressCallback, username);
+  // Always resolve username from R2 inside the operation (do not trust provided username)
+  const result = await getNewsSummary(userId, platform, progressCallback, null);
   return res.json(result);
 });
 

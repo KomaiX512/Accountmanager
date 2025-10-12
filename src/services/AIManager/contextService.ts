@@ -8,8 +8,8 @@ import { getApiUrl } from '../../config/api';
 
 export interface UserContext {
   userId: string;
-  username: string;
-  platforms: PlatformInfo[];
+  realName: string; // User's REAL name from Firebase (e.g., "Komail Hassan")
+  platforms: PlatformInfo[]; // Each platform has its own username
   currentPlatform?: string;
   currentPage: string;
   stats: UserStats;
@@ -52,8 +52,10 @@ export interface Activity {
 class ContextService {
   /**
    * Get comprehensive user context for AI Manager
+   * @param userId - Firebase user ID
+   * @param realName - User's real name from Firebase currentUser.displayName
    */
-  async getUserContext(userId: string): Promise<UserContext> {
+  async getUserContext(userId: string, realName?: string): Promise<UserContext> {
     try {
       console.log('🔍 [ContextService] Fetching user context for:', userId);
 
@@ -64,37 +66,26 @@ class ContextService {
         this.getRecentActivity(userId)
       ]);
 
-      // Get username from multiple sources (prioritize platform-specific)
-      let username = 'user';
-      const currentPlatform = this.getCurrentPlatform();
-      
-      // Try platform-specific username first
-      const platformUsername = localStorage.getItem(`${currentPlatform}_username_${userId}`);
-      if (platformUsername && platformUsername !== 'Sentient ai' && platformUsername !== userId) {
-        username = platformUsername;
-        console.log(`✅ [ContextService] Found username from ${currentPlatform}:`, username);
-      } else {
-        // Try accountHolder
-        const accountHolder = localStorage.getItem('accountHolder');
-        if (accountHolder && accountHolder !== 'Sentient ai') {
-          username = accountHolder;
-          console.log('✅ [ContextService] Found username from accountHolder:', username);
-        } else {
-          // Try any platform
-          for (const platform of ['instagram', 'twitter', 'facebook', 'linkedin']) {
-            const platformUser = localStorage.getItem(`${platform}_username_${userId}`);
-            if (platformUser && platformUser !== 'Sentient ai' && platformUser !== userId) {
-              username = platformUser;
-              console.log(`✅ [ContextService] Found username from ${platform}:`, username);
-              break;
-            }
-          }
+      // CRITICAL: Use REAL NAME for AI to address the user, NOT platform usernames
+      // Real name comes from Firebase displayName (e.g., "Komail Hassan")
+      // Platform usernames (e.g., @muhammad_muti) are stored per-platform in platforms array
+      let finalRealName = realName || 'there';
+      if (!realName || realName === 'Sentient ai' || realName === userId) {
+        // Fallback to first connected platform username only if no real name
+        const connectedPlatform = platforms.status === 'fulfilled' 
+          ? platforms.value.find(p => p.connected && p.username)
+          : null;
+        if (connectedPlatform?.username) {
+          finalRealName = connectedPlatform.username;
+          console.log(`⚠️ [ContextService] No real name provided, using ${connectedPlatform.name} username as fallback:`, finalRealName);
         }
+      } else {
+        console.log(`✅ [ContextService] Using real name from Firebase:`, finalRealName);
       }
 
       const context: UserContext = {
         userId,
-        username,
+        realName: finalRealName,
         platforms: platforms.status === 'fulfilled' ? platforms.value : [],
         currentPage: window.location.pathname,
         stats: stats.status === 'fulfilled' ? stats.value : this.getDefaultStats(),
@@ -110,20 +101,10 @@ class ContextService {
     }
   }
 
-  /**
-   * Get current platform from URL
-   */
-  private getCurrentPlatform(): string {
-    const path = window.location.pathname;
-    if (path.includes('instagram')) return 'instagram';
-    if (path.includes('twitter')) return 'twitter';
-    if (path.includes('facebook')) return 'facebook';
-    if (path.includes('linkedin')) return 'linkedin';
-    return 'instagram'; // default
-  }
 
   /**
    * Get information about user's connected platforms
+   * CRITICAL: Fetches platform-specific username from BACKEND R2, not localStorage
    */
   private async getPlatformInfo(userId: string): Promise<PlatformInfo[]> {
     const platforms: PlatformInfo[] = [];
@@ -132,30 +113,60 @@ class ContextService {
 
     for (const platformName of platformNames) {
       try {
-        // Check localStorage first
-        const accessed = localStorage.getItem(`${platformName}_accessed_${userId}`);
-        const username = localStorage.getItem(`${platformName}_username_${userId}`);
+        console.log(`🔍 [ContextService] Checking ${platformName} status from backend...`);
         
-        if (accessed === 'true' && username) {
-          // Try to get profile data from RAG
-          const profileData = await this.getProfileData(platformName, username);
+        // ALWAYS check backend R2 for platform status (source of truth)
+        const statusResponse = await axios.get(
+          getApiUrl(`/api/user-${platformName}-status/${userId}`),
+          { timeout: 5000, validateStatus: () => true }
+        );
+        
+        if (statusResponse.status === 200 && statusResponse.data) {
+          const statusData = statusResponse.data;
+          const hasEnteredKey = platformName === 'twitter' ? 'hasEnteredTwitterUsername'
+            : platformName === 'facebook' ? 'hasEnteredFacebookUsername'
+            : platformName === 'linkedin' ? 'hasEnteredLinkedInUsername'
+            : 'hasEnteredInstagramUsername';
           
-          platforms.push({
-            name: platformName,
-            connected: true,
-            username,
-            profileData,
-            postsCount: profileData?.posts?.length || 0,
-            lastSync: localStorage.getItem(`${platformName}_last_sync_${userId}`) || undefined
-          });
+          const usernameKey = `${platformName}_username`;
+          const connected = Boolean(statusData[hasEnteredKey]);
+          const username = statusData[usernameKey];
+          
+          if (connected && username) {
+            console.log(`✅ [ContextService] ${platformName} connected: @${username}`);
+            
+            // Try to get profile data (optional, don't fail if unavailable)
+            let profileData = null;
+            try {
+              profileData = await this.getProfileData(platformName, username);
+            } catch (err) {
+              console.warn(`⚠️ Could not fetch profile data for ${username}:`, err);
+            }
+            
+            platforms.push({
+              name: platformName,
+              connected: true,
+              username,
+              profileData,
+              postsCount: profileData?.posts?.length || 0,
+              lastSync: new Date().toISOString()
+            });
+          } else {
+            console.log(`❌ [ContextService] ${platformName} not connected`);
+            platforms.push({
+              name: platformName,
+              connected: false
+            });
+          }
         } else {
+          console.log(`❌ [ContextService] ${platformName} status check failed (${statusResponse.status})`);
           platforms.push({
             name: platformName,
             connected: false
           });
         }
-      } catch (error) {
-        console.error(`Error checking ${platformName}:`, error);
+      } catch (error: any) {
+        console.error(`❌ [ContextService] Error checking ${platformName}:`, error.message);
         platforms.push({
           name: platformName,
           connected: false
@@ -163,6 +174,7 @@ class ContextService {
       }
     }
 
+    console.log(`📊 [ContextService] Platform summary: ${platforms.filter(p => p.connected).length}/${platforms.length} connected`);
     return platforms;
   }
 
@@ -269,9 +281,9 @@ class ContextService {
     else timeGreeting = 'Good night';
 
     const connectedPlatforms = context.platforms.filter(p => p.connected);
-    const platformNames = connectedPlatforms.map(p => p.name).join(', ');
+    const platformNames = connectedPlatforms.map(p => `${p.name} (@${p.username})`).join(', ');
 
-    let greeting = `${timeGreeting}, ${context.username}! 👋\n\n`;
+    let greeting = `${timeGreeting}, ${context.realName}! 👋\n\n`;
 
     if (connectedPlatforms.length > 0) {
       greeting += `You have ${connectedPlatforms.length} platform${connectedPlatforms.length > 1 ? 's' : ''} connected: ${platformNames}.\n\n`;
@@ -305,22 +317,25 @@ class ContextService {
 
     return `
 CURRENT USER CONTEXT:
-- User: ${context.username}
+- User's Real Name: ${context.realName} (ALWAYS address user by this name, NOT by platform username)
+- User ID: ${context.userId}
 - Connected Platforms: ${connectedPlatforms || 'None'}
 - Total Posts: ${context.stats.totalPosts}
 - Account Age: ${context.stats.accountAge}
 - Top Competitors: ${competitorsList || 'None'}
 - Current Page: ${context.currentPage}
 
-USER STATUS:
-${context.platforms.map(p => `- ${p.name}: ${p.connected ? `✅ Connected (@${p.username}, ${p.postsCount} posts)` : '❌ Not connected'}`).join('\n')}
+PLATFORM STATUS (Each platform has its OWN username):
+${context.platforms.map(p => `- ${p.name}: ${p.connected ? `✅ Connected (username: @${p.username}, ${p.postsCount} posts)` : '❌ Not connected'}`).join('\n')}
 
-IMPORTANT:
-- If user asks about platforms, tell them about the above connected platforms
-- If user asks to create posts on unconnected platforms, tell them to connect first
-- Be natural and conversational, not robotic
-- Reference their actual data when relevant
-- If asked about competitors, mention the ones listed above
+CRITICAL RULES:
+1. ALWAYS address the user by their real name "${context.realName}", NEVER by userId or platform username
+2. When user asks "what is my name?", respond with "${context.realName}"
+3. Each platform has a DIFFERENT username - Instagram username ≠ Twitter username
+4. When retrieving data, use the SPECIFIC platform's username, not a generic username
+5. If user asks about a platform that shows "❌ Not connected", tell them it's not connected
+6. If asked about competitors, mention the ones listed above
+7. Be natural and conversational, not robotic
 `.trim();
   }
 
@@ -346,10 +361,10 @@ IMPORTANT:
     };
   }
 
-  private getDefaultContext(userId: string): UserContext {
+  private getDefaultContext(userId: string, realName?: string): UserContext {
     return {
       userId,
-      username: 'user',
+      realName: realName || 'user',
       platforms: [],
       currentPage: window.location.pathname,
       stats: this.getDefaultStats(),

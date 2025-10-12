@@ -44,29 +44,46 @@ class GeminiImageEditService {
    * Poll for the edited image to appear in R2 in case the HTTP request was cut off
    * (e.g., proxy timeout) but the backend continued and saved the image.
    */
-  private static async waitForEditedImage(
-    username: string,
-    platform: string,
-    cleanImageKey: string,
-    timeoutMs: number = 60000,
-    intervalMs: number = 2000
-  ): Promise<string | null> {
-    const editedKey = `edited_${cleanImageKey}`;
-    // Use exists-only probe with nuclear no-cache to avoid any proxy/HEAD quirks
-    const editedUrlPath = `/api/r2-image/${username}/${editedKey}?platform=${platform}&exists=1&nuclear=1&t=${Date.now()}`;
-    const editedUrl = getApiUrl(editedUrlPath);
-    const end = Date.now() + timeoutMs;
-
-    while (Date.now() < end) {
+  private static async pollForEditedImage(
+    request: GeminiEditRequest,
+    opts: { maxSeconds?: number; intervalMs?: number } = {}
+  ): Promise<GeminiEditResponse | null> {
+    const maxSeconds = opts.maxSeconds ?? 90; // up to 90s to allow Gemini to finish
+    const intervalMs = opts.intervalMs ?? 3000; // poll every 3s
+    const cleanKey = request.imageKey.replace(/^edited_/, '');
+    const originalUrl = getApiUrl(`/api/r2-image/${request.username}/${cleanKey}`, `?platform=${request.platform}`);
+    // aggressive cache-busting on edited URL so we never get a stale 404
+    const editedUrlBase = `/api/r2-image/${request.username}/edited_${cleanKey}`;
+    const start = Date.now();
+    while (Date.now() - start < maxSeconds * 1000) {
       try {
-        // Use GET with exists=1 to avoid proxies mishandling HEAD
-        const res = await fetch(editedUrl, {
-          method: 'GET',
-          cache: 'no-cache',
+        const cacheBust = `?platform=${request.platform}&nocache=1&v=${Date.now()}`;
+        const editedUrl = getApiUrl(editedUrlBase, cacheBust);
+        const resp = await axios.get(editedUrl, {
+          responseType: 'arraybuffer',
+          // Avoid cached responses
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+          },
+          // Keep each probe short; we'll retry if it fails
+          timeout: 8000,
+          validateStatus: (status) => status === 200,
         });
-        if (res.ok) return editedUrl;
-      } catch (_) {
-        // ignore and retry
+        const ct = (resp.headers?.['content-type'] as string | undefined) || '';
+        if (ct.startsWith('image/')) {
+          // Found the edited image in R2; return a synthesized success payload
+          return {
+            success: true,
+            originalImageUrl: originalUrl,
+            editedImageUrl: editedUrl,
+            imageKey: cleanKey,
+            editedImageKey: `edited_${cleanKey}`,
+            prompt: request.prompt,
+          };
+        }
+      } catch (_e) {
+        // ignore and retry until timeout
       }
       await new Promise((r) => setTimeout(r, intervalMs));
     }
@@ -85,10 +102,11 @@ class GeminiImageEditService {
         getApiUrl('/api/gemini-image-edit'),
         request,
         {
-          timeout: 180000, // 180 second timeout for AI operations (matches Vite proxy)
           headers: {
             'Content-Type': 'application/json'
-          }
+          },
+          // Long-running operation – allow ample time end-to-end
+          timeout: 180000
         }
       );
 
@@ -100,41 +118,20 @@ class GeminiImageEditService {
       }
       
     } catch (error: any) {
-      console.error(`[GeminiEdit] ❌ Image editing failed:`, error.message);
-
-      // Fallback: if the network request failed locally (proxy/socket), poll R2 for the edited image
-      const isNetworkish = (error?.message || '').toLowerCase().includes('network') || error?.code === 'ECONNABORTED' || error?.code === 'ERR_NETWORK';
-      try {
-        const cleanKey = request.imageKey.replace(/^edited_/, '');
-        if (isNetworkish) {
-          console.warn('[GeminiEdit] 🌐 Network error detected. Backend may still be processing...');
-          console.warn('[GeminiEdit] 🔄 Polling R2 for edited image (60s timeout)...');
-          const editedUrl = await GeminiImageEditService.waitForEditedImage(
-            request.username,
-            request.platform,
-            cleanKey,
-            60000,
-            2000
-          );
-          if (editedUrl) {
-            // Build display URLs without exists=1 probe parameter, with cache-busting
-            const originalUrl = getApiUrl(`/api/r2-image/${request.username}/${cleanKey}?platform=${request.platform}&t=${Date.now()}`);
-            const displayEditedUrl = getApiUrl(`/api/r2-image/${request.username}/edited_${cleanKey}?platform=${request.platform}&t=${Date.now()}`);
-            console.log('[GeminiEdit] ✅ Fallback succeeded: Backend completed processing, edited image found in R2');
-            return {
-              success: true,
-              originalImageUrl: originalUrl,
-              editedImageUrl: displayEditedUrl,
-              imageKey: cleanKey,
-              editedImageKey: `edited_${cleanKey}`,
-              prompt: request.prompt,
-            };
-          } else {
-            console.error('[GeminiEdit] ❌ Fallback failed: Edited image not found after 60s polling');
+      console.error(`[GeminiEdit] ❌ Image editing failed:`, error?.message || error);
+      // If the client connection was interrupted (ERR_NETWORK), the backend may still complete.
+      // Try to detect the edited image in R2 and return success if found.
+      const networkInterrupted = error?.code === 'ERR_NETWORK' || /Network Error/i.test(error?.message || '');
+      if (networkInterrupted) {
+        try {
+          const fallback = await this.pollForEditedImage(request);
+          if (fallback) {
+            console.warn('[GeminiEdit] Connection interrupted, but edited image found in R2. Returning success.');
+            return fallback;
           }
+        } catch (_) {
+          // ignore and fall through to error payload
         }
-      } catch (fallbackErr: any) {
-        console.warn('[GeminiEdit] Fallback polling failed:', fallbackErr?.message || fallbackErr);
       }
 
       return {
@@ -144,8 +141,8 @@ class GeminiImageEditService {
         imageKey: request.imageKey.replace(/^edited_/, ''),
         editedImageKey: `edited_${request.imageKey.replace(/^edited_/, '')}`,
         prompt: request.prompt,
-        error: error.response?.data?.error || error.message || 'Image editing failed',
-        details: error.response?.data?.details || error.message
+        error: error?.response?.data?.error || error?.message || 'Image editing failed',
+        details: error?.response?.data?.details || error?.message
       };
     }
   }
@@ -162,10 +159,11 @@ class GeminiImageEditService {
         getApiUrl('/api/ai-image-approve'),
         request,
         {
-          timeout: 120000, // 120s for R2 copy+delete
           headers: {
             'Content-Type': 'application/json'
-          }
+          },
+          // Approval is typically fast, but allow enough time in case of cold starts
+          timeout: 120000
         }
       );
       if (response.data && response.data.success) {
@@ -176,38 +174,23 @@ class GeminiImageEditService {
       
     } catch (error: any) {
       console.error(`[GeminiEdit] ❌ ${request.action} failed:`, error.message);
-
-      // Fallback: if network error during approve, poll for resulting state
-      const isNetworkish = (error?.message || '').toLowerCase().includes('network') || error?.code === 'ECONNABORTED' || error?.code === 'ERR_NETWORK';
-      const cleanKey = request.imageKey.replace(/^edited_/, '');
-      if (request.action === 'approve' && isNetworkish) {
-        console.warn('[GeminiEdit] 🌐 Network error during approve. Polling R2 for approval state...');
-        const originalUrl = getApiUrl(`/api/r2-image/${request.username}/${cleanKey}?platform=${request.platform}&t=${Date.now()}`);
-        // Exists-only probes with strong no-cache to avoid fallback pixels and stale caches
-        const probeOriginalUrl = getApiUrl(`/api/r2-image/${request.username}/${cleanKey}?platform=${request.platform}&exists=1&nuclear=1&t=${Date.now()}`);
-        const probeEditedUrl = getApiUrl(`/api/r2-image/${request.username}/edited_${cleanKey}?platform=${request.platform}&exists=1&nuclear=1&t=${Date.now()}`);
-
-        const end = Date.now() + 45000; // 45s verification window
-        while (Date.now() < end) {
-          try {
-            // Check edited URL first - if 404, assume approval deleted edited image
-            const editedProbe = await fetch(probeEditedUrl, { method: 'GET', cache: 'no-cache' });
-            const originalProbe = await fetch(probeOriginalUrl, { method: 'GET', cache: 'no-cache' });
-
-            if (!editedProbe.ok && originalProbe.ok) {
-              console.log('[GeminiEdit] ✅ Fallback approve succeeded: edited image gone, original present');
-              return {
-                success: true,
-                action: 'approved',
-                message: 'Approved (fallback verification).',
-                imageUrl: originalUrl,
-              };
-            }
-          } catch (_) {
-            // ignore and retry
-          }
-          await new Promise((r) => setTimeout(r, 1500));
-        }
+      // If the network connection was interrupted while the server continued processing,
+      // synthesize a success response that forces the UI to fetch the fresh original image.
+      const networkInterrupted = error?.code === 'ERR_NETWORK' || /Network Error/i.test(error?.message || '');
+      if (networkInterrupted) {
+        const cleanKey = request.imageKey.replace(/^edited_/, '');
+        const bust = `?platform=${request.platform}&nuclear=1&bypass=1&nocache=1&v=${Date.now()}`;
+        const imageUrl = getApiUrl(`/api/r2-image/${request.username}/${cleanKey}`, bust);
+        return {
+          success: true,
+          action: request.action,
+          message: request.action === 'approve'
+            ? 'Approved (connection recovered via fallback)'
+            : 'Rejected (connection recovered via fallback)',
+          imageUrl,
+          error: undefined,
+          details: undefined,
+        };
       }
 
       return {

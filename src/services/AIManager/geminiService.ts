@@ -40,11 +40,20 @@ export class GeminiAIService {
     this.genAI = new GoogleGenerativeAI(apiKey);
   }
 
-  async initialize(userId: string) {
-    // Fetch user context
-    this.userContext = await contextService.getUserContext(userId);
-    this.initializeModel();
+  /**
+   * Initialize with user context
+   * @param userId - Firebase user ID
+   * @param realName - User's real name from Firebase displayName
+   */
+  async initialize(userId: string, realName?: string) {
+    try {
+      this.userContext = await contextService.getUserContext(userId, realName);
+      this.initializeModel();
+    } catch (error) {
+      console.error('Error initializing Gemini AI Service:', error);
+    }
   }
+
   private initializeModel() {
     // Get function declarations from operation registry
     const functions = operationRegistry.toGeminiFunctionDeclarations();
@@ -70,11 +79,17 @@ export class GeminiAIService {
    * Generate dynamic system instruction based on user context
    */
   private generateSystemInstruction(): string {
-    const baseInstruction = `You are an AI Manager for Sentient Marketing, a social media management platform.
+    const baseInstruction = `You are the Sentient AI Manager for a social media management platform.
 
-Your role is to help users perform operations through natural language commands AND answer general questions conversationally.
-
+**CORE IDENTITY PROTOCOL:**
+You serve ONE user at a time. Their identity:
 ${this.userContext ? contextService.formatContextForAI(this.userContext) : ''}
+
+**CRITICAL ARCHITECTURE RULES:**
+1. ALWAYS use platform-specific usernames for data operations
+2. NEVER hallucinate data - only report what exists in actual files
+3. If data unavailable, explain which file/platform needs to be connected
+4. Cite sources: "Based on your Instagram profile (@username)..."
 
 **Your Capabilities:**
 
@@ -202,18 +217,17 @@ Remember: Be natural, be helpful, be lively!`;
   async processMessage(
     userId: string,
     message: string,
-    context: Partial<OperationContext>
+    context: Partial<OperationContext> & { realName?: string }
   ): Promise<AIMessage> {
     try {
-      // CRITICAL: Refresh user context on EACH message
-      this.userContext = await contextService.getUserContext(userId);
-      if (context.username) {
-        this.userContext.username = context.username;
-      }
+      // CRITICAL: Refresh user context on EACH message with real name
+      this.userContext = await contextService.getUserContext(userId, context.realName);
       
       console.log('🔄 [Gemini] Refreshed context for message:', {
-        username: this.userContext.username,
-        platforms: this.userContext.platforms.filter(p => p.connected).length
+        realName: this.userContext.realName,
+        userId: this.userContext.userId,
+        connectedPlatforms: this.userContext.platforms.filter(p => p.connected).length,
+        platformUsernames: this.userContext.platforms.filter(p => p.connected).map(p => `${p.name}:@${p.username}`).join(', ')
       });
       
       // Reinitialize model with current context
@@ -247,7 +261,9 @@ Remember: Be natural, be helpful, be lively!`;
       });
 
       // Send message with current context
-      const contextAwareMessage = `User context: ${this.userContext.username}, platforms: ${this.userContext.platforms.filter(p => p.connected).map(p => p.name).join(', ')}\n\nUser query: ${message}`;
+      const connectedPlatforms = this.userContext.platforms.filter(p => p.connected);
+      const platformDetails = connectedPlatforms.map(p => `${p.name}(@${p.username})`).join(', ');
+      const contextAwareMessage = `User: ${this.userContext.realName}, Connected Platforms: ${platformDetails || 'None'}\n\nUser query: ${message}`;
       
       const result = await chat.sendMessage(contextAwareMessage);
       const response = result.response;
@@ -345,45 +361,6 @@ Remember: Be natural, be helpful, be lively!`;
     }
 
     return conv;
-  }
-
-  /**
-   * Build chat history for Gemini
-   */
-  private buildChatHistory(context: ConversationContext): any[] {
-    const history: any[] = [];
-
-    for (const msg of context.conversationHistory) {
-      if (msg.role === 'user') {
-        history.push({
-          role: 'user',
-          parts: [{ text: msg.content }]
-        });
-      } else if (msg.role === 'assistant') {
-        const parts: any[] = [{ text: msg.content }];
-        
-        // Add function call results if available
-        if (msg.operationCalls) {
-          for (const call of msg.operationCalls) {
-            if (call.result) {
-              parts.push({
-                functionResponse: {
-                  name: call.operationId,
-                  response: call.result
-                }
-              });
-            }
-          }
-        }
-
-        history.push({
-          role: 'model',
-          parts
-        });
-      }
-    }
-
-    return history;
   }
 
   /**

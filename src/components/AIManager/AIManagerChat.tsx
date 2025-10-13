@@ -334,15 +334,75 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
 
   // Auto-scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = document.querySelector('.ai-manager-messages') as HTMLDivElement | null;
+    if (container) {
+      try {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      } catch {
+        container.scrollTop = container.scrollHeight;
+      }
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
   }, [messages]);
 
   // Focus input when opened
   useEffect(() => {
     if (isOpen && !isMinimized) {
-      inputRef.current?.focus();
+      const el = inputRef.current;
+      if (el) {
+        try {
+          (el as any).focus({ preventScroll: true });
+        } catch {
+          el.focus();
+        }
+      }
     }
   }, [isOpen, isMinimized]);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body as HTMLBodyElement & { dataset: { aiScrollY?: string } };
+    if (isOpen) {
+      const scrollY = window.scrollY || window.pageYOffset || 0;
+      body.dataset.aiScrollY = String(scrollY);
+      html.classList.add('ai-manager-open');
+      body.classList.add('ai-manager-open');
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollY}px`;
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.width = '100%';
+    } else {
+      const y = parseInt(body.dataset.aiScrollY || '0', 10);
+      html.classList.remove('ai-manager-open');
+      body.classList.remove('ai-manager-open');
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.width = '';
+      if (!Number.isNaN(y)) {
+        window.scrollTo(0, y);
+      }
+      delete body.dataset.aiScrollY;
+    }
+
+    return () => {
+      const y = parseInt(document.body.dataset.aiScrollY || '0', 10);
+      document.documentElement.classList.remove('ai-manager-open');
+      document.body.classList.remove('ai-manager-open');
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.width = '';
+      if (!Number.isNaN(y)) {
+        window.scrollTo(0, y);
+      }
+      delete (document.body as any).dataset.aiScrollY;
+    };
+  }, [isOpen]);
 
   // CRITICAL: Force chat window to be viewport-fixed when opened
   useEffect(() => {

@@ -12,6 +12,29 @@
   contain: none !important;
 }
 
+html.ai-manager-open,
+body.ai-manager-open {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  height: 100% !important;
+  touch-action: none !important;
+  transform: none !important;
+  perspective: none !important;
+}
+
+body.ai-manager-open #root,
+body.ai-manager-open .dashboard-page,
+body.ai-manager-open .main-dashboard-wrapper,
+body.ai-manager-open .homepage,
+body.ai-manager-open .pricing-page,
+body.ai-manager-open .content-wrapper,
+body.ai-manager-open [data-scroll-container] {
+  transform: none !important;
+  perspective: none !important;
+  contain: none !important;
+  overflow: visible !important;
+}
+
 /* Ensure parent containers don't interfere with AI Manager positioning */
 html:has(.ai-manager-button-container),
 body:has(.ai-manager-button-container),

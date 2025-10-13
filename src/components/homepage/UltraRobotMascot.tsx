@@ -2,7 +2,6 @@ import React, { useRef, useMemo, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { 
   OrbitControls, 
-  Environment, 
   ContactShadows,
   RoundedBox,
   Sphere,
@@ -10,11 +9,9 @@ import {
   Html,
   MeshReflectorMaterial,
   Torus,
-  Box,
-  Text
+  Box
 } from '@react-three/drei';
 import * as THREE from 'three';
-import { useAuth } from '../../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import './UltraRobotMascot.css';
 
@@ -1187,7 +1184,6 @@ const UltraRobotMascot: React.FC<UltraRobotMascotProps> = () => {
   const [showInput, setShowInput] = useState(true);
   const [isNamed, setIsNamed] = useState(false);
   const [savedName, setSavedName] = useState('');
-  const { currentUser } = useAuth();
 
   // Check if robot is already named on mount
   React.useEffect(() => {
@@ -1210,15 +1206,10 @@ const UltraRobotMascot: React.FC<UltraRobotMascotProps> = () => {
       setIsCelebrating(true);
       setShowInput(false);
 
-      // After 2.5 seconds, navigate based on auth status
+      // After 2.5 seconds, navigate to main dashboard
       setTimeout(() => {
-        if (currentUser) {
-          // User is logged in - go to main dashboard
-          window.location.href = '/maindashboard';
-        } else {
-          // User not logged in - go to signup
-          window.location.href = '/account';
-        }
+        // Always navigate to /account which shows MainDashboard for logged-in users
+        window.location.href = '/account';
       }, 2500);
     }
   };

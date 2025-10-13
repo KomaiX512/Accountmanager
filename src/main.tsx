@@ -48,7 +48,8 @@ rootElement.style.willChange = 'transform';
 // Note: In production, Vite automatically handles modulepreload optimization.
 // Raw /src/* paths don't exist in production builds and cause 404/MIME errors.
 // Use Vite's compile-time flag so this block is tree-shaken in production builds.
-if (import.meta.env.DEV) {
+// Skip preloading for ngrok to avoid overwhelming free tier with too many requests
+if (import.meta.env.DEV && !window.location.hostname.includes('ngrok')) {
   const criticalResources = [
     '/src/components/dashboard/PlatformDashboard.tsx',
     '/src/components/instagram/Dashboard.css',

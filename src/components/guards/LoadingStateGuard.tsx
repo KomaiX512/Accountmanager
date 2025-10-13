@@ -114,7 +114,9 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
     
     // 🚀 ULTRA-CRITICAL: BYPASS CHECK FIRST - If bypass active, STOP ALL VALIDATION IMMEDIATELY
     if (platform && currentUser?.uid && isBypassActive(platform, currentUser.uid)) {
-      // BYPASS IS ACTIVE - COMPLETELY SKIP ALL VALIDATION
+      // 🔒 Respect user bypass: do not clear bypass here. It will be cleaned up
+      // when processing completes naturally (ProcessingLoadingState) or when
+      // the bypass timer expires (TopBar cleanup). Skip all validation.
       return; // Exit immediately - no validation needed
     }
     

@@ -23,6 +23,22 @@ const Facebook: React.FC = () => {
       return;
     }
 
+    // Reset sentinel gating to avoid flicker after reset
+    try {
+      const sentinelKey = `facebook_reset_pending_${currentUser.uid}`;
+      const tsRaw = localStorage.getItem(sentinelKey);
+      if (tsRaw) {
+        const tsNum = parseInt(tsRaw, 10);
+        if (Number.isFinite(tsNum) && Date.now() - tsNum < 20000) {
+          setIsLoading(false);
+          setHasChecked(true);
+          return;
+        } else {
+          localStorage.removeItem(sentinelKey);
+        }
+      }
+    } catch {}
+
     let intervalId: NodeJS.Timeout;
     let isChecking = false;
 

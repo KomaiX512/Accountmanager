@@ -649,12 +649,47 @@ export class OperationExecutor {
       });
 
       // Call RAG endpoint to generate post (RAG expects "query" not "prompt")
-      // CRITICAL: 180s timeout to match server's image generation time (3 minutes)
-      const response = await axios.post(getApiUrl('/api/post-generator'), {
+      // No frontend timeout: rely on backend limits and server-side timeouts
+      const payload = {
         platform: targetPlatform,
         username: username,
         query: `Create a ${tone || 'professional'} ${targetPlatform} post about: ${prompt}${includeImage !== false ? '. Include visual elements.' : ''}`
-      }, { timeout: 180000, validateStatus: () => true });
+      };
+      let response: any;
+      try {
+        response = await axios.post(getApiUrl('/api/post-generator'), payload, { timeout: 0, validateStatus: () => true });
+      } catch (primaryErr: any) {
+        console.warn('⚠️ Primary post-generator path failed, retrying via /api/rag/post-generator:', primaryErr?.message || primaryErr);
+        try {
+          response = await axios.post(getApiUrl('/api/rag/post-generator'), payload, { timeout: 0, validateStatus: () => true });
+        } catch (secondaryErr: any) {
+          console.warn('⚠️ Axios retries failed, attempting fetch fallback for post generation...');
+          // Fallback to fetch with no timeout
+          try {
+            const res = await fetch(getApiUrl('/api/post-generator'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+              response = { status: res.status, data: await res.json() };
+            } else {
+              const res2 = await fetch(getApiUrl('/api/rag/post-generator'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              });
+              if (res2.ok) {
+                response = { status: res2.status, data: await res2.json() };
+              } else {
+                throw new Error(`Post generator HTTP ${res.status} and fallback HTTP ${res2.status}`);
+              }
+            }
+          } catch (fetchErr: any) {
+            throw fetchErr;
+          }
+        }
+      }
 
       // Validate response with helpful error messages
       if (response.status === 500 || response.status === 503) {
@@ -771,22 +806,50 @@ export class OperationExecutor {
       // Step 4: Create post from news
       const postQuery = `Create an engaging ${targetPlatform} post about this trending news: ${newsItem.title || newsItem.description}. ${newsItem.content || newsItem.summary || ''}${customization ? ` Additional instructions: ${customization}` : ''}`;
       
-      const response = await axios.post(
-        getApiUrl('/api/post-generator'), 
-        {
-          platform: targetPlatform,
-          username: username,
-          query: postQuery,
-          includeImage: true,
-          tone: 'professional',
-          newsSource: {
-            title: newsItem.title,
-            url: newsItem.url,
-            source: newsItem.source
+      let response: any;
+      const newsPayload = {
+        platform: targetPlatform,
+        username: username,
+        query: postQuery,
+        newsContext: {
+          title: newsItem.title || newsItem.description || 'Trending news',
+          url: newsItem.url,
+          source: newsItem.source
+        }
+      };
+      try {
+        response = await axios.post(getApiUrl('/api/post-generator'), newsPayload, { timeout: 0, validateStatus: () => true });
+      } catch (primaryErr: any) {
+        console.warn('⚠️ Primary news post-generator path failed, retrying via /api/rag/post-generator:', primaryErr?.message || primaryErr);
+        try {
+          response = await axios.post(getApiUrl('/api/rag/post-generator'), newsPayload, { timeout: 0, validateStatus: () => true });
+        } catch (secondaryErr: any) {
+          console.warn('⚠️ Axios retries failed, attempting fetch fallback for news post generation...');
+          try {
+            const res = await fetch(getApiUrl('/api/post-generator'), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newsPayload)
+            });
+            if (res.ok) {
+              response = { status: res.status, data: await res.json() };
+            } else {
+              const res2 = await fetch(getApiUrl('/api/rag/post-generator'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newsPayload)
+              });
+              if (res2.ok) {
+                response = { status: res2.status, data: await res2.json() };
+              } else {
+                throw new Error(`Post generator HTTP ${res.status} and fallback HTTP ${res2.status}`);
+              }
+            }
+          } catch (fetchErr: any) {
+            throw fetchErr;
           }
-        },
-        { timeout: 180000, validateStatus: () => true }
-      );
+        }
+      }
 
       // Step 5: Trigger frontend refresh
       if (typeof window !== 'undefined') {

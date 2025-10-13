@@ -64,7 +64,7 @@ export const AIManagerRobot: React.FC<AIManagerRobotProps> = ({ onClick, onHover
           <UltraRobot isCelebrating={raise} scaleFactor={0.35} />
         </group>
 
-        <Environment preset="night" />
+        {/* Environment removed to fix HDR loading error */}
         <ContactShadows rotation={[Math.PI / 2, 0, 0]} position={[0, -1.55, 0]} opacity={0.5} width={6} height={6} blur={2.5} far={3} />
       </Canvas>
 

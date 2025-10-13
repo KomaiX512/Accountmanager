@@ -2258,11 +2258,14 @@ const MainDashboard: React.FC = () => {
   }, [currentUser?.uid, platforms, getPlatformAccessStatus, getPlatformConnectionStatus]);
 
   // Sort platforms so claimed ones appear first
-  const sortedPlatforms = [...platforms].sort((a, b) => {
-    if (a.claimed && !b.claimed) return -1;
-    if (!a.claimed && b.claimed) return 1;
-    return 0;
-  });
+  // ✅ SAFETY CHECK: Ensure platforms is always an array
+  const sortedPlatforms = Array.isArray(platforms) 
+    ? [...platforms].sort((a, b) => {
+        if (a.claimed && !b.claimed) return -1;
+        if (!a.claimed && b.claimed) return 1;
+        return 0;
+      })
+    : [];
   
   // Function to mark platform as accessed - used for platform management  
   const markPlatformAccessed = useCallback((platformId: string) => {

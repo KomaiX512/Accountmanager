@@ -319,7 +319,9 @@ const PostCooked: React.FC<PostCookedProps> = ({ username, profilePicUrl, posts 
 
   // Function to mark posts as viewed
   const markPostsAsViewed = () => {
-    const newViewedPosts = new Set(localPosts.map(p => p.key));
+    // ✅ SAFETY: Ensure localPosts is array before mapping
+    const safePosts = Array.isArray(localPosts) ? localPosts : [];
+    const newViewedPosts = new Set(safePosts.map(p => p.key));
     setViewedPosts(newViewedPosts);
     CacheManager.setCacheData(getViewedStorageKey(), Array.from(newViewedPosts), platform, username, 'posts');
   };

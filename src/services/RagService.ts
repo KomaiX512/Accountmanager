@@ -421,20 +421,56 @@ class RagService {
       }
       
       const response = await this.deduplicatedRequest(cacheKey, async () => {
-        return await this.tryServerUrls(`/api/rag/post-generator`, (url) => 
-          axios.post(url, {
+        return await this.tryServerUrls(`/api/rag/post-generator`, async (url) => {
+          const body = {
             username,
             query,
             platform,
             firebaseUID: (JSON.parse(localStorage.getItem('currentUser') || 'null') || {})?.uid
-          }, {
-            timeout: 60000, // 60 second timeout for image generation + queueing
-            withCredentials: false, // Disable sending cookies
-            headers: {
-              'Content-Type': 'application/json'
+          };
+          // Primary attempt: axios → /api/rag/post-generator with NO timeout
+          try {
+            return await axios.post(url, body, {
+              timeout: 0, // no client timeout
+              withCredentials: false,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          } catch (primaryErr: any) {
+            // Secondary attempt: axios → /api/post-generator
+            try {
+              return await axios.post('/api/post-generator', body, {
+                timeout: 0,
+                withCredentials: false,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            } catch (secondaryErr: any) {
+              // Final fallback: fetch without timeout on both endpoints
+              try {
+                const res = await fetch(url, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body)
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  return { data, status: res.status } as any;
+                }
+                const res2 = await fetch('/api/post-generator', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body)
+                });
+                if (res2.ok) {
+                  const data2 = await res2.json();
+                  return { data: data2, status: res2.status } as any;
+                }
+                throw new Error(`HTTP ${res.status} and fallback HTTP ${res2.status}`);
+              } catch (fetchErr) {
+                throw fetchErr;
+              }
             }
-          }), this.RAG_SERVER_URLS
-        );
+          }
+        }, this.RAG_SERVER_URLS);
       }, true);
       
       // Process the result

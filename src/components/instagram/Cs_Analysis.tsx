@@ -300,7 +300,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     fetchAccountInfo();
   }, [normalizedAccountHolder, platform]);
 
-  const competitorsQuery = localCompetitors.length > 0 ? localCompetitors.join(',') : '';
+  const competitorsQuery = (Array.isArray(localCompetitors) && localCompetitors.length > 0) ? localCompetitors.join(',') : '';
   // Build endpoint: keep URL stable to avoid runaway re-fetches.
   // Do not force server cache bypass; use client-side cache busting handled by useR2Fetch when needed.
   const baseCompetitorEndpoint = competitorsQuery 
@@ -324,11 +324,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   // ✅ NEW: Combine local competitors with any competitors in loading state
   const allDisplayCompetitors = React.useMemo(() => {
     const loadingCompetitors = Object.keys(competitorLoadingStates);
-    const allCompetitors = [...new Set([...localCompetitors, ...loadingCompetitors])];
+    // ✅ CRITICAL FIX: Ensure localCompetitors is array before spreading
+    const safeLocalCompetitors = Array.isArray(localCompetitors) ? localCompetitors : [];
+    const allCompetitors = [...new Set([...safeLocalCompetitors, ...loadingCompetitors])];
     return allCompetitors;
   }, [localCompetitors, competitorLoadingStates]);
 
-  const competitorData = allDisplayCompetitors.map(competitor => {
+  // ✅ SAFETY CHECK: Ensure allDisplayCompetitors is array before mapping
+  const competitorData = (Array.isArray(allDisplayCompetitors) ? allDisplayCompetitors : []).map(competitor => {
     const dataForCompetitor = allCompetitorsFetch.data?.find(item => item.competitor === competitor) || null;
     
     // Enhanced debug logging
@@ -543,12 +546,14 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
   }, [competitors, fetchAccountInfoWithRetry, normalizedAccountHolder, platform]);
 
   useEffect(() => {
-    localCompetitors.forEach(competitor => {
-      if (!competitorProfiles[competitor] && !profileErrors[competitor]) {
-        fetchCompetitorProfile(competitor);
-      }
-    });
-  }, [localCompetitors, fetchCompetitorProfile]);
+    if (Array.isArray(localCompetitors)) {
+      localCompetitors.forEach(competitor => {
+        if (!competitorProfiles[competitor] && !profileErrors[competitor]) {
+          fetchCompetitorProfile(competitor);
+        }
+      });
+    }
+  }, [localCompetitors, competitorProfiles, profileErrors, fetchCompetitorProfile]);
 
   useEffect(() => {
     if (toast) {
@@ -662,8 +667,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
 
     setLoading(true);
-    const originalCompetitors = [...localCompetitors];
-    const updatedCompetitors = [...localCompetitors, newCompetitor];
+    const safeCompetitors = Array.isArray(localCompetitors) ? localCompetitors : [];
+    const originalCompetitors = [...safeCompetitors];
+    const updatedCompetitors = [...safeCompetitors, newCompetitor];
     // ✅ FIXED: Don't update localCompetitors immediately to prevent duplicate containers
     // Only update after server confirmation
 
@@ -719,7 +725,7 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
       setToast('No competitor selected for editing.');
       return;
     }
-    if (localCompetitors.includes(editCompetitor) && editCompetitor !== currentCompetitor) {
+    if (Array.isArray(localCompetitors) && localCompetitors.includes(editCompetitor) && editCompetitor !== currentCompetitor) {
       setToast('Competitor username already exists.');
       return;
     }
@@ -733,8 +739,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
     }
 
     setLoading(true);
-    const originalCompetitors = [...localCompetitors];
-    const updatedCompetitors = localCompetitors.map(comp =>
+    const safeCompetitors = Array.isArray(localCompetitors) ? localCompetitors : [];
+    const originalCompetitors = [...safeCompetitors];
+    const updatedCompetitors = safeCompetitors.map(comp =>
       comp === currentCompetitor ? editCompetitor : comp
     );
     // ✅ FIXED: Don't update localCompetitors immediately to prevent duplicate containers
@@ -810,8 +817,9 @@ const Cs_Analysis: React.FC<Cs_AnalysisProps> = ({ accountHolder, competitors, p
 
   const handleDeleteCompetitor = async (competitor: string) => {
     setLoading(true);
-    const originalCompetitors = [...localCompetitors];
-    const updatedCompetitors = localCompetitors.filter(comp => comp !== competitor);
+    const safeCompetitors = Array.isArray(localCompetitors) ? localCompetitors : [];
+    const originalCompetitors = [...safeCompetitors];
+    const updatedCompetitors = safeCompetitors.filter(comp => comp !== competitor);
     setLocalCompetitors(updatedCompetitors);
 
     // ✅ NEW: Stop smart loading for deleted competitor

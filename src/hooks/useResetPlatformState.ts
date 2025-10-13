@@ -105,6 +105,64 @@ export const useResetPlatformState = () => {
   }, []);
 
   /**
+   * Verifies backend access/claimed status is cleared after reset
+   */
+  const verifyBackendAccessCleared = useCallback(async (platform: string, userId: string): Promise<boolean> => {
+    console.log(`[ResetPlatformState] 🔍 Verifying backend access cleared for ${platform}`);
+    const maxAttempts = 8;
+    const delayMs = 1000;
+    const makeUserStatusEndpoint = (p: string) => {
+      if (p === 'instagram') return `/api/user-instagram-status/${userId}`;
+      if (p === 'twitter') return `/api/user-twitter-status/${userId}`;
+      if (p === 'facebook') return `/api/user-facebook-status/${userId}`;
+      if (p === 'linkedin') return `/api/user-linkedin-status/${userId}`;
+      return `/api/platform-access/${userId}`;
+    };
+    const isUnclaimed = (p: string, data: any) => {
+      if (p === 'instagram') return data?.hasEnteredInstagramUsername !== true;
+      if (p === 'twitter') return data?.hasEnteredTwitterUsername !== true;
+      if (p === 'facebook') return data?.hasEnteredFacebookUsername !== true;
+      if (p === 'linkedin') return data?.hasEnteredLinkedInUsername !== true;
+      return data?.[p]?.claimed !== true;
+    };
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const ts = Date.now();
+        const statusResp = await fetch(`${makeUserStatusEndpoint(platform)}?ts=${ts}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        const accessResp = await fetch(`/api/platform-access/${userId}?ts=${ts}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        let statusOk = false;
+        let accessOk = false;
+        if (statusResp.ok) {
+          const json = await statusResp.json();
+          const data = json?.data || json;
+          statusOk = isUnclaimed(platform, data);
+        } else if (statusResp.status === 404) {
+          statusOk = true;
+        }
+        if (accessResp.ok) {
+          const json = await accessResp.json();
+          const data = json?.data || json;
+          accessOk = data?.[platform]?.claimed !== true;
+        } else if (accessResp.status === 404) {
+          accessOk = true;
+        }
+
+        if (statusOk && accessOk) {
+          console.log(`[ResetPlatformState] ✅ Backend access cleared for ${platform}`);
+          return true;
+        }
+        console.log(`[ResetPlatformState] ⏳ Backend access not yet cleared for ${platform} (attempt ${attempt}/${maxAttempts})`);
+      } catch (err) {
+        console.warn(`[ResetPlatformState] ⚠️ Error verifying backend access cleared:`, err);
+      }
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+    console.warn(`[ResetPlatformState] ❌ Backend access did not clear within verification window for ${platform}`);
+    return false;
+  }, []);
+
+  /**
    * Clears all platform-specific sessionStorage entries
    */
   const clearPlatformSessionStorage = useCallback((platform: string, userId: string) => {
@@ -375,6 +433,13 @@ export const useResetPlatformState = () => {
         return false;
       }
 
+      // Step 2.1b: Verify backend access/claimed state is cleared
+      const accessCleared = await verifyBackendAccessCleared(platform, userId);
+      if (!accessCleared) {
+        console.warn(`[ResetPlatformState] ❌ Backend access not cleared for ${platform}. Aborting navigation to ensure entry form shows.`);
+        return false;
+      }
+
       // Step 2.2: Proactively mark claimed=false on backend so future mirrors don't re-acquire
       try {
         await fetch(`/api/platform-access/${userId}`, {
@@ -409,14 +474,19 @@ export const useResetPlatformState = () => {
         }));
       } catch {}
 
-      // Step 5: Navigate to main dashboard if requested
+      // Step 5: Navigate to entry username form for this platform
       if (navigateToMain) {
-        console.log(`[ResetPlatformState] 🧭 Navigating to main dashboard`);
-        
-        // Use replace to prevent the reset dashboard from appearing in history
-        navigate('/account', { 
+        console.log(`[ResetPlatformState] 🧭 Navigating to entry form for ${platform}`);
+        const entryPath = platform === 'twitter' 
+          ? '/twitter' 
+          : platform === 'facebook' 
+          ? '/facebook' 
+          : platform === 'linkedin' 
+          ? '/linkedin' 
+          : '/instagram';
+        navigate(entryPath, {
           replace: true,
-          state: { 
+          state: {
             resetPlatform: platform,
             resetTimestamp: Date.now()
           }

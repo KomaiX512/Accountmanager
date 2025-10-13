@@ -299,24 +299,71 @@
   text-decoration: underline;
 }
 
-/* Auth Loading Screen */
+/* Auth Loading Screen - Professional Logo Animation */
 .auth-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100vh;
+  width: 100vw;
   background: #000000;
   color: #ffffff;
 }
 
+/* Logo Loading Container */
+.logo-loading-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Logo Image - Centered and Circular */
+.logo-loading-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  z-index: 2;
+  position: relative;
+  box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+  animation: logoGlow 2s ease-in-out infinite;
+}
+
+/* Animated Ring Around Logo */
+.logo-loading-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 3px solid transparent;
+  border-top-color: #00ffcc;
+  border-right-color: #00ffcc;
+  border-radius: 50%;
+  animation: spin 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+  z-index: 1;
+}
+
+/* Logo Glow Animation */
+@keyframes logoGlow {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 50px rgba(0, 255, 204, 0.6), 0 0 80px rgba(0, 255, 204, 0.3);
+  }
+}
+
+/* Keep old spinner for backward compatibility */
 .auth-loading .spinner {
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
   border-top-color: #00ffcc;
-  animation: spinner 1s linear infinite;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
   margin-bottom: 16px;
 }
 

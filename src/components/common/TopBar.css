@@ -412,6 +412,54 @@
   transform: translateY(1px);
 }
 
+/* Logout button styles - Top right corner */
+.logout-button-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 80, 80, 0.1);
+  color: #ff5050;
+  font-weight: 600;
+  font-size: clamp(0.8rem, 1.8vw, 0.9rem);
+  border: 1.5px solid rgba(255, 80, 80, 0.3);
+  border-radius: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 12px rgba(255, 80, 80, 0.15);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.logout-button-topbar:hover {
+  background: rgba(255, 80, 80, 0.2);
+  border-color: rgba(255, 80, 80, 0.5);
+  color: #ffaaaa;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(255, 80, 80, 0.25);
+}
+
+.logout-button-topbar:active {
+  transform: translateY(0);
+}
+
+.logout-button-topbar svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.5;
+}
+
+/* User profile section container */
+.user-profile-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  z-index: 2;
+}
+
 /* ✨ MOBILE HAMBURGER MENU STYLES */
 .mobile-menu-toggle {
   display: none;
@@ -1245,6 +1293,16 @@ div.user-profile div.user-avatar img {
     width: 36px;
     height: 36px;
   }
+  
+  .logout-button-topbar {
+    font-size: 0.85rem;
+    padding: 7px 14px;
+  }
+  
+  .logout-button-topbar svg {
+    width: 16px;
+    height: 16px;
+  }
 }
 
 @media (max-width: 1366px) {
@@ -1252,11 +1310,65 @@ div.user-profile div.user-avatar img {
     width: 34px;
     height: 34px;
   }
+  
+  .logout-button-topbar {
+    font-size: 0.8rem;
+    padding: 6px 12px;
+  }
+  
+  .logout-button-topbar svg {
+    width: 15px;
+    height: 15px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .logout-button-topbar span {
+    display: none;
+  }
+  
+  .logout-button-topbar {
+    padding: 8px;
+    gap: 0;
+  }
+  
+  .logout-button-topbar svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
 @media (max-width: 768px) {
   .user-avatar {
     width: 32px;
     height: 32px;
+  }
+  
+  .logout-button-topbar {
+    padding: 7px;
+  }
+  
+  .logout-button-topbar svg {
+    width: 16px;
+    height: 16px;
+  }
+  
+  .user-profile-section {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .logout-button-topbar {
+    padding: 6px;
+  }
+  
+  .logout-button-topbar svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .user-profile-section {
+    gap: 6px;
   }
 }

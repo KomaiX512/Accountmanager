@@ -7,6 +7,7 @@ export default defineConfig({
     // Allow local development via ngrok without hardcoding single subdomains.
     // Vite treats entries as hostnames; providing a parent domain allows any subdomain.
     // You can also extend via env: VITE_ALLOWED_HOSTS="foo.example.com,bar.example.com"
+    host: '0.0.0.0', // Allow external connections for ngrok
     allowedHosts: [
       // Local
       'localhost',
@@ -14,20 +15,16 @@ export default defineConfig({
       // Any subdomain of ngrok (v2 and v3 domains)
       /.+\.ngrok-free\.app$/,
       /.+\.ngrok\.app$/,
+      // Specific ngrok tunnel for testing
+      '9ab73bd5c6c5.ngrok-free.app',
       // Optional additional hosts via env
       ...(process.env.VITE_ALLOWED_HOSTS
         ? process.env.VITE_ALLOWED_HOSTS.split(',').map((s) => s.trim()).filter(Boolean)
         : [])
     ],
-    // Optional HMR tweaks for ngrok: set NGROK_HOST to your public domain (e.g. abc.ngrok-free.app)
-    // and HMR will connect over wss:443 which fixes websocket upgrade issues behind HTTPS tunnels.
-    hmr: process.env.NGROK_HOST
-      ? {
-          host: process.env.NGROK_HOST,
-          protocol: 'wss',
-          clientPort: 443,
-        }
-      : undefined,
+    // Optional HMR tweaks for ngrok: disabled for ngrok free tier to avoid WebSocket issues
+    // and connection limits that cause 503 errors
+    hmr: false,
     proxy: {
       // Image endpoints live on proxy server (3002)
       '/api/r2-image': {

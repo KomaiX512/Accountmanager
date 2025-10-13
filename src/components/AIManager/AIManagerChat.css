@@ -549,6 +549,7 @@ div.ai-manager-window,
   max-height: 140px;
   overflow-y: auto;
   padding-right: 4px;
+  padding-left: 4px; /* Prevent icon clipping on desktop too */
 }
 
 .suggestions-grid::-webkit-scrollbar {
@@ -580,11 +581,12 @@ div.ai-manager-window,
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px; /* Increased gap for better spacing */
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-height: 32px; /* Ensure consistent height */
 }
 
 .suggestion-chip:hover:not(:disabled) {
@@ -612,8 +614,11 @@ div.ai-manager-window,
   font-size: 16px;
   flex-shrink: 0;
   width: 16px;
+  min-width: 16px;
   text-align: center;
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.2s ease;
   color: rgba(255, 255, 255, 0.8);
 }
@@ -722,8 +727,16 @@ div.ai-manager-window,
   cursor: not-allowed;
 }
 
-/* Mobile Responsive */
+/* Mobile Responsive - OPTIMIZED FOR MOBILE */
 @media (max-width: 767px) {
+  /* Button container mobile positioning */
+  .ai-manager-button-container {
+    bottom: 20px !important;
+    left: 20px !important;
+    right: auto !important;
+  }
+
+  /* Toggle button mobile sizing */
   .ai-manager-toggle {
     bottom: 20px;
     left: 20px;
@@ -731,29 +744,287 @@ div.ai-manager-window,
     height: 56px;
   }
 
+  /* Chat window mobile - full screen */
   .ai-manager-window {
-    bottom: 0;
-    right: 0;
-    left: 0;
-    width: 100%;
-    height: 100vh;
-    border-radius: 0;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    transform: translateZ(0) !important;
+    isolation: isolate !important;
+    contain: none !important;
+    z-index: 2147483647 !important;
   }
 
+  /* Minimized state mobile */
   .ai-manager-window.minimized {
-    height: 60px;
-    bottom: 20px;
-    left: 20px;
-    right: 20px;
-    width: calc(100% - 40px);
-    border-radius: 16px;
+    position: fixed !important;
+    height: 60px !important;
+    bottom: 20px !important;
+    left: 20px !important;
+    right: 20px !important;
+    top: auto !important;
+    width: calc(100% - 40px) !important;
+    border-radius: 16px !important;
+    transform: translateZ(0) !important;
+    isolation: isolate !important;
+    contain: none !important;
+    z-index: 2147483647 !important;
+  }
+
+  /* Header mobile optimization */
+  .ai-manager-header {
+    padding: 16px 20px;
+    min-height: 60px;
+  }
+
+  .ai-manager-header-left {
+    gap: 12px;
+  }
+
+  .ai-manager-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .ai-manager-title h3 {
+    font-size: 18px;
+  }
+
+  .ai-manager-status {
+    font-size: 13px;
+  }
+
+  .ai-manager-header-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  /* Messages mobile optimization */
+  .ai-manager-messages {
+    padding: 16px 20px;
+    gap: 20px;
+  }
+
+  .ai-message {
+    max-width: 90%;
+  }
+
+  .ai-message-content {
+    padding: 16px 18px;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .ai-message-timestamp {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  /* CRITICAL: Fix clipped icons in suggestions */
+  .ai-manager-suggestions {
+    padding: 16px 20px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .suggestions-label {
+    font-size: 12px;
+    margin-bottom: 12px;
+    padding: 0 4px;
   }
 
   .suggestions-grid {
     grid-template-columns: 1fr;
+    gap: 8px;
+    max-height: 160px;
+    padding-right: 8px;
+    padding-left: 4px; /* Add left padding to prevent icon clipping */
+  }
+
+  .suggestion-chip {
+    padding: 14px 16px;
+    font-size: 13px;
+    min-height: 48px; /* Ensure proper touch target */
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 204, 0.25);
+    transition: all 0.2s ease;
+  }
+
+  .suggestion-chip:hover:not(:disabled) {
+    background: rgba(0, 255, 204, 0.15);
+    border-color: rgba(0, 255, 204, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 255, 204, 0.25);
+  }
+
+  /* CRITICAL: Fix icon clipping with proper sizing and spacing */
+  .suggestion-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    width: 20px;
+    min-width: 20px;
+    height: 20px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    color: rgba(255, 255, 255, 0.9);
+    margin-right: 4px; /* Ensure spacing from text */
+  }
+
+  .suggestion-chip:hover:not(:disabled) .suggestion-icon {
+    transform: scale(1.1);
+    color: #00ffcc;
+  }
+
+  .suggestion-text {
+    font-size: 13px;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    flex: 1;
+    word-wrap: break-word;
+  }
+
+  /* Context display mobile */
+  .ai-manager-context {
+    padding: 16px 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .context-tag {
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 14px;
+  }
+
+  /* Input mobile optimization */
+  .ai-manager-input-container {
+    padding: 20px;
+    gap: 16px;
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .ai-manager-input {
+    padding: 16px 18px;
+    font-size: 16px; /* Prevent zoom on iOS */
+    border-radius: 14px;
+    min-height: 20px;
+  }
+
+  .ai-manager-input:focus {
+    box-shadow: 0 0 0 4px rgba(0, 255, 204, 0.15);
+  }
+
+  .ai-manager-send {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 14px;
+  }
+
+  .ai-manager-send i {
+    font-size: 20px;
+  }
+
+  /* Greeting bubble mobile */
+  .ai-manager-greeting-bubble {
+    left: 90px !important;
+    bottom: 30px !important;
+    max-width: calc(100vw - 120px);
+    padding: 18px 22px;
+  }
+
+  .greeting-text {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+}
+
+/* Small mobile devices (iPhone SE, etc.) */
+@media (max-width: 375px) {
+  .ai-manager-button-container {
+    bottom: 16px !important;
+    left: 16px !important;
+  }
+
+  .ai-manager-toggle {
+    width: 52px;
+    height: 52px;
+  }
+
+  .ai-manager-window.minimized {
+    bottom: 16px !important;
+    left: 16px !important;
+    right: 16px !important;
+    width: calc(100% - 32px) !important;
+  }
+
+  .ai-manager-header {
+    padding: 14px 16px;
+  }
+
+  .ai-manager-messages {
+    padding: 14px 16px;
+  }
+
+  .ai-manager-suggestions {
+    padding: 14px 16px;
   }
 
   .suggestion-chip {
     padding: 12px 14px;
+    min-height: 44px;
+  }
+
+  .suggestion-icon {
+    font-size: 16px;
+    width: 18px;
+    min-width: 18px;
+  }
+
+  .ai-manager-input-container {
+    padding: 16px;
+  }
+
+  .ai-manager-greeting-bubble {
+    left: 80px !important;
+    max-width: calc(100vw - 100px);
+    padding: 16px 20px;
+  }
+}
+
+/* Landscape mobile orientation */
+@media (max-width: 767px) and (orientation: landscape) {
+  .ai-manager-window {
+    height: 100vh !important;
+  }
+
+  .ai-manager-suggestions {
+    max-height: 120px;
+  }
+
+  .suggestions-grid {
+    max-height: 80px;
   }
 }

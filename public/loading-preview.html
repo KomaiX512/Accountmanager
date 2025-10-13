@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading Animation Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .auth-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+    }
+
+    /* Logo Loading Container */
+    .logo-loading-container {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Logo Image - Centered and Circular */
+    .logo-loading-image {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      z-index: 2;
+      position: relative;
+      box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+      animation: logoGlow 2s ease-in-out infinite;
+    }
+
+    /* Animated Ring Around Logo */
+    .logo-loading-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 3px solid transparent;
+      border-top-color: #00ffcc;
+      border-right-color: #00ffcc;
+      border-radius: 50%;
+      animation: spin 1.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+      z-index: 1;
+    }
+
+    /* Logo Glow Animation */
+    @keyframes logoGlow {
+      0%, 100% {
+        box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 50px rgba(0, 255, 204, 0.6), 0 0 80px rgba(0, 255, 204, 0.3);
+      }
+    }
+
+    /* Spin Animation */
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .preview-info {
+      margin-top: 40px;
+      text-align: center;
+      color: #00ffcc;
+    }
+
+    .preview-info h1 {
+      font-size: 24px;
+      margin-bottom: 10px;
+    }
+
+    .preview-info p {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-loading">
+    <div class="logo-loading-container">
+      <img src="/Logo/logo.png" alt="Loading" class="logo-loading-image" />
+      <div class="logo-loading-ring"></div>
+    </div>
+    
+    <div class="preview-info">
+      <h1>Professional Loading Animation</h1>
+      <p>This replaces "Authenticating..." text across the app</p>
+      <p style="margin-top: 20px; font-size: 12px;">
+        ✨ Circular logo with pulsing glow<br>
+        🔄 Animated ring with smooth rotation<br>
+        🎨 Brand colors (#00ffcc)
+      </p>
+    </div>
+  </div>
+</body>
+</html>

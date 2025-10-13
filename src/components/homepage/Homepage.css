@@ -760,6 +760,333 @@
   flex-wrap: wrap;
 }
 
+/* Laptop Responsive Scaling - 1400px to 700px */
+@media (min-width: 769px) and (max-width: 1400px) {
+  .homepage {
+    transform-origin: center top;
+  }
+  
+  /* Scale down proportionally for smaller laptop screens */
+  @media (max-width: 1400px) {
+    .hero-section {
+      transform: scale(0.95);
+      transform-origin: center top;
+    }
+    
+    .glassy-hero {
+      max-width: 850px;
+      padding: 3.5rem;
+    }
+    
+    .gradient-text {
+      font-size: 5rem;
+    }
+    
+    .title-intro {
+      font-size: 1.6rem;
+    }
+    
+    .title-sub {
+      font-size: 1.4rem;
+    }
+    
+    .hero-description {
+      font-size: 1.15rem;
+    }
+  }
+  
+  @media (max-width: 1200px) {
+    .hero-section {
+      transform: scale(0.88);
+      transform-origin: center top;
+    }
+    
+    .glassy-hero {
+      max-width: 800px;
+      padding: 3rem;
+    }
+    
+    .gradient-text {
+      font-size: 4.5rem;
+    }
+    
+    .title-intro {
+      font-size: 1.5rem;
+    }
+    
+    .title-sub {
+      font-size: 1.3rem;
+    }
+    
+    .hero-description {
+      font-size: 1.1rem;
+    }
+    
+    .section-header h2 {
+      font-size: 2.7rem;
+    }
+    
+    .features-grid,
+    .user-types-grid,
+    .steps-grid {
+      gap: 1.8rem;
+    }
+  }
+  
+  @media (max-width: 1000px) {
+    .hero-section {
+      transform: scale(0.8);
+      transform-origin: center top;
+      min-height: 90vh;
+    }
+    
+    .glassy-hero {
+      max-width: 750px;
+      padding: 2.5rem;
+    }
+    
+    .gradient-text {
+      font-size: 4rem;
+    }
+    
+    .title-intro {
+      font-size: 1.4rem;
+    }
+    
+    .title-sub {
+      font-size: 1.2rem;
+    }
+    
+    .hero-description {
+      font-size: 1rem;
+    }
+    
+    .btn-primary.large,
+    .btn-secondary.large {
+      padding: 1rem 2rem;
+      font-size: 1.1rem;
+      min-width: 200px;
+    }
+    
+    .section-header h2 {
+      font-size: 2.5rem;
+    }
+    
+    .features-grid,
+    .user-types-grid,
+    .steps-grid {
+      gap: 1.5rem;
+    }
+    
+    .glassy-card,
+    .user-type-card,
+    .step-card {
+      padding: 2rem;
+    }
+  }
+  
+  @media (max-width: 900px) {
+    .hero-section {
+      transform: scale(0.75);
+      transform-origin: center top;
+      min-height: 85vh;
+    }
+    
+    .glassy-hero {
+      max-width: 700px;
+      padding: 2.2rem;
+    }
+    
+    .gradient-text {
+      font-size: 3.8rem;
+    }
+    
+    .title-intro {
+      font-size: 1.3rem;
+    }
+    
+    .title-sub {
+      font-size: 1.15rem;
+    }
+    
+    .hero-description {
+      font-size: 0.95rem;
+    }
+    
+    .section-header h2 {
+      font-size: 2.3rem;
+    }
+    
+    .glassy-cta h2 {
+      font-size: 2.5rem;
+    }
+  }
+  
+  @media (max-width: 850px) {
+    .hero-section {
+      transform: scale(0.7);
+      transform-origin: center top;
+      min-height: 80vh;
+    }
+    
+    .glassy-hero {
+      max-width: 650px;
+      padding: 2rem;
+    }
+    
+    .gradient-text {
+      font-size: 3.5rem;
+    }
+    
+    .title-intro {
+      font-size: 1.2rem;
+    }
+    
+    .title-sub {
+      font-size: 1.1rem;
+    }
+    
+    .hero-description {
+      font-size: 0.9rem;
+      margin-bottom: 2.5rem;
+    }
+    
+    .btn-primary.large,
+    .btn-secondary.large {
+      padding: 0.9rem 1.8rem;
+      font-size: 1rem;
+      min-width: 180px;
+    }
+    
+    .section-header h2 {
+      font-size: 2.2rem;
+    }
+    
+    .features-grid,
+    .user-types-grid,
+    .steps-grid {
+      gap: 1.3rem;
+    }
+  }
+  
+  @media (max-width: 800px) {
+    .hero-section {
+      transform: scale(0.65);
+      transform-origin: center top;
+      min-height: 75vh;
+    }
+    
+    .glassy-hero {
+      max-width: 600px;
+      padding: 1.8rem;
+    }
+    
+    .gradient-text {
+      font-size: 3.2rem;
+    }
+    
+    .title-intro {
+      font-size: 1.15rem;
+    }
+    
+    .title-sub {
+      font-size: 1.05rem;
+    }
+    
+    .hero-description {
+      font-size: 0.85rem;
+      margin-bottom: 2rem;
+    }
+    
+    .section-header h2 {
+      font-size: 2rem;
+    }
+    
+    .glassy-cta h2 {
+      font-size: 2.2rem;
+    }
+    
+    .glassy-card,
+    .user-type-card,
+    .step-card {
+      padding: 1.8rem;
+    }
+  }
+  
+  @media (max-width: 700px) {
+    .hero-section {
+      transform: scale(0.6);
+      transform-origin: center top;
+      min-height: 70vh;
+    }
+    
+    .glassy-hero {
+      max-width: 550px;
+      padding: 1.5rem;
+    }
+    
+    .gradient-text {
+      font-size: 3rem;
+    }
+    
+    .title-intro {
+      font-size: 1.1rem;
+    }
+    
+    .title-sub {
+      font-size: 1rem;
+    }
+    
+    .hero-description {
+      font-size: 0.8rem;
+      margin-bottom: 1.8rem;
+    }
+    
+    .btn-primary.large,
+    .btn-secondary.large {
+      padding: 0.8rem 1.5rem;
+      font-size: 0.95rem;
+      min-width: 160px;
+    }
+    
+    .section-header h2 {
+      font-size: 1.9rem;
+    }
+    
+    .glassy-cta h2 {
+      font-size: 2rem;
+    }
+    
+    .features-grid,
+    .user-types-grid,
+    .steps-grid {
+      gap: 1.2rem;
+    }
+    
+    .glassy-card,
+    .user-type-card,
+    .step-card {
+      padding: 1.5rem;
+    }
+    
+    .feature-icon,
+    .user-type-icon,
+    .step-icon {
+      font-size: 2.5rem;
+    }
+    
+    .feature-card h3,
+    .user-type-card h3,
+    .step-card h3 {
+      font-size: 1.3rem;
+    }
+    
+    .stat-number {
+      font-size: 2.5rem;
+    }
+  }
+}
+
 /* Responsive Design - Mobile Optimized */
 @media (max-width: 768px) {
   .homepage {

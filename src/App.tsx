@@ -741,6 +741,23 @@ const AppContent: React.FC = () => {
             : response.data.hasEnteredInstagramUsername;
           
           if (hasEnteredUsername) {
+            // Reset sentinel override to prevent dashboard bounce during reset
+            try {
+              const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : isLinkedInDashboard ? 'linkedin' : 'instagram';
+              const uid = currentUser.uid;
+              const sentinelKey = `${platformKey}_reset_pending_${uid}`;
+              const tsRaw = localStorage.getItem(sentinelKey);
+              if (tsRaw) {
+                const tsNum = parseInt(tsRaw, 10);
+                if (Number.isFinite(tsNum) && Date.now() - tsNum < 20000) {
+                  const entryPath = platformKey === 'twitter' ? '/twitter' : platformKey === 'facebook' ? '/facebook' : platformKey === 'linkedin' ? '/linkedin' : '/instagram';
+                  safeNavigate(navigate, entryPath, { replace: true }, 5);
+                  return;
+                } else {
+                  localStorage.removeItem(sentinelKey);
+                }
+              }
+            } catch {}
             const savedUsername = isTwitterDashboard 
               ? response.data.twitter_username
               : isFacebookDashboard
@@ -805,9 +822,21 @@ const AppContent: React.FC = () => {
               replace: true
             }, 5); // Medium priority for user data loading
           } else {
-            // Backend says not set up; fall back to local cache before redirecting
             const platformKey = isTwitterDashboard ? 'twitter' : isFacebookDashboard ? 'facebook' : isLinkedInDashboard ? 'linkedin' : 'instagram';
             const uid = currentUser.uid;
+            try {
+              const sentinelKey = `${platformKey}_reset_pending_${uid}`;
+              const tsRaw = localStorage.getItem(sentinelKey);
+              if (tsRaw) {
+                const tsNum = parseInt(tsRaw, 10);
+                if (Number.isFinite(tsNum) && Date.now() - tsNum < 20000) {
+                  const entryPath = platformKey === 'twitter' ? '/twitter' : platformKey === 'facebook' ? '/facebook' : platformKey === 'linkedin' ? '/linkedin' : '/instagram';
+                  safeNavigate(navigate, entryPath, { replace: true }, 5);
+                  return;
+                }
+              }
+            } catch {}
+            // Backend says not set up; fall back to local cache before redirecting
             try {
               const hasAccessed = localStorage.getItem(`${platformKey}_accessed_${uid}`) === 'true';
               let cachedUsername = localStorage.getItem(`${platformKey}_username_${uid}`) || '';
@@ -882,6 +911,18 @@ const AppContent: React.FC = () => {
           // Network or server error; fall back to cached platform state before redirecting
           const platformKey = location.pathname.includes('twitter') ? 'twitter' : location.pathname.includes('facebook') ? 'facebook' : location.pathname.includes('linkedin') ? 'linkedin' : 'instagram';
           const uid = currentUser.uid;
+          try {
+            const sentinelKey = `${platformKey}_reset_pending_${uid}`;
+            const tsRaw = localStorage.getItem(sentinelKey);
+            if (tsRaw) {
+              const tsNum = parseInt(tsRaw, 10);
+              if (Number.isFinite(tsNum) && Date.now() - tsNum < 20000) {
+                const entryPath = platformKey === 'twitter' ? '/twitter' : platformKey === 'facebook' ? '/facebook' : platformKey === 'linkedin' ? '/linkedin' : '/instagram';
+                safeNavigate(navigate, entryPath, { replace: true }, 5);
+                return;
+              }
+            }
+          } catch {}
           try {
             const hasAccessed = localStorage.getItem(`${platformKey}_accessed_${uid}`) === 'true';
             let cachedUsername = localStorage.getItem(`${platformKey}_username_${uid}`) || '';

@@ -168,7 +168,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                 {adminState.loading ? (
                   <>
                     <span className="spinner"></span>
-                    Authenticating...
+                    Verifying...
                   </>
                 ) : (
                   'Login to Admin Panel'

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import UserDropdown from '../auth/UserDropdown';
 import { useAuth } from '../../context/AuthContext';
+import { LogOut } from 'lucide-react';
 import PlatformButton from './PlatformButton';
 import PWAInstallButton from './PWAInstallButton';
 import { usePlatformStatus } from '../../hooks/usePlatformStatus';
@@ -12,7 +13,7 @@ import { useMobileDetection } from '../../hooks/useMobileDetection';
 const TopBar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser } = useAuth();
+  const { currentUser, signOut } = useAuth();
   const { getAcquiredPlatforms } = usePlatformStatus();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useMobileDetection();
@@ -50,15 +51,13 @@ const TopBar: React.FC = () => {
               const remaining = Math.ceil((timer.endTime - now) / 60000);
               console.log(`⏱️ TOPBAR TIMER: ${platform} - ${remaining}min remaining`);
             } else {
-              // Timer expired, clear bypass
-              console.log(`🧹 TOPBAR CLEANUP: ${platform} bypass timer expired, removing`);
-              localStorage.removeItem(bypassKey);
-              localStorage.removeItem(timerKey);
+              // Timer expired locally — preserve bypass until backend marks completion
+              hasActiveBypass = true;
+              console.log(`⏱️ TOPBAR TIMER: ${platform} timer expired locally; preserving bypass until backend completes`);
             }
           } catch (e) {
             console.error(`❌ TOPBAR ERROR: Failed to parse ${platform} bypass timer:`, e);
-            // Clear corrupted data
-            localStorage.removeItem(bypassKey);
+            // Clear only timer data; preserve bypass flag until backend confirms completion
             localStorage.removeItem(timerKey);
           }
         }
@@ -224,12 +223,26 @@ const TopBar: React.FC = () => {
           )}
           
           {currentUser ? (
-            <div style={{ 
+            <div className="user-profile-section" style={{ 
               /* 🔒 VPS COMPATIBILITY: Inline styles as backup for circular profile image */
               display: 'flex',
-              alignItems: 'center'
+              alignItems: 'center',
+              gap: '12px'
             }}>
               <UserDropdown />
+              <motion.button
+                className="logout-button-topbar"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={async () => {
+                  await signOut();
+                  navigate('/login');
+                }}
+                title="Logout"
+              >
+                <LogOut size={18} />
+                <span>Logout</span>
+              </motion.button>
             </div>
           ) : (
             <motion.button

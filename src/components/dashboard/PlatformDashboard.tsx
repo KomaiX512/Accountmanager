@@ -785,7 +785,23 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
         throw new Error(`Failed to fetch ${platform} notifications: ${response.status} ${response.statusText}`);
       }
       
-      const raw = await response.json();
+      // ✅ CRITICAL: Protect against HTML responses (404/error pages)
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error(`[${platform.toUpperCase()}] Non-JSON response received: ${contentType}`);
+        setNotifications([]);
+        return;
+      }
+      
+      let raw: any;
+      try {
+        raw = await response.json();
+      } catch (jsonError) {
+        console.error(`[${platform.toUpperCase()}] JSON parse error:`, jsonError);
+        setNotifications([]);
+        return;
+      }
+      
       let data: any[] = Array.isArray(raw)
         ? raw
         : Array.isArray((raw as any)?.notifications)
@@ -853,6 +869,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
       console.log(`[${new Date().toISOString()}] Fetching AI replies for ${platform} with accountHolder: "${accountHolder}"`);
       const aiReplies = await RagService.fetchAIReplies(accountHolder, platform);
       console.log(`[${new Date().toISOString()}] Received ${aiReplies.length} ${platform} AI replies`);
+      
+      // ✅ SAFETY CHECK: Ensure data is array before mapping
+      if (!Array.isArray(data)) {
+        console.error(`[${new Date().toISOString()}] [${platform.toUpperCase()}] Data is not an array before processing:`, typeof data);
+        setNotifications([]);
+        return;
+      }
       
       const processedNotifications = data.map((notif: any) => {
         const matchingAiReply = aiReplies.find(pair => {
@@ -1141,6 +1164,13 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
     if (accountHolder) {
       RagService.loadConversations(accountHolder, platform)
         .then(messages => {
+          // ✅ SAFETY CHECK: Ensure messages is array before mapping
+          if (!Array.isArray(messages)) {
+            console.error(`[${platform.toUpperCase()}] loadConversations returned non-array:`, typeof messages);
+            setChatMessages([]);
+            return;
+          }
+          
           const safeMessages = messages.map(msg => ({
             role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
             content: msg.content

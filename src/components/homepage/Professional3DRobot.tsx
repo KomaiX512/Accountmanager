@@ -213,8 +213,7 @@ function Scene({ mousePosition }: RobotProps) {
         <Robot mousePosition={mousePosition} />
       </Float>
 
-      {/* Professional Environment */}
-      <Environment preset="city" />
+      {/* Professional Environment - Removed external HDR to fix loading error */}
       
       {/* Contact Shadows */}
       <ContactShadows

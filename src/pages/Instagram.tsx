@@ -17,7 +17,28 @@ const Instagram: React.FC = () => {
 
   useEffect(() => {
     // Prevent multiple API calls
-    if (hasChecked || !currentUser?.uid) {
+    if (!currentUser?.uid) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Reset sentinel gating to avoid flicker after reset
+    try {
+      const sentinelKey = `instagram_reset_pending_${currentUser.uid}`;
+      const tsRaw = localStorage.getItem(sentinelKey);
+      if (tsRaw) {
+        const tsNum = parseInt(tsRaw, 10);
+        if (Number.isFinite(tsNum) && Date.now() - tsNum < 20000) {
+          setIsLoading(false);
+          setHasChecked(true);
+          return;
+        } else {
+          localStorage.removeItem(sentinelKey);
+        }
+      }
+    } catch {}
+
+    if (hasChecked) {
       setIsLoading(false);
       return;
     }

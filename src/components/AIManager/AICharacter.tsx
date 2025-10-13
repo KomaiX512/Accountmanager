@@ -5,7 +5,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { RoundedBox, Sphere, Cylinder, Torus } from '@react-three/drei';
+import { RoundedBox, Sphere, Cylinder, Torus, Box } from '@react-three/drei';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import './AICharacter.css';
@@ -193,6 +193,129 @@ function MiniRobot({ isRaised }: { isRaised: boolean }) {
       <Cylinder args={[0.14, 0.14, 0.5, 16]} position={[0.35, -0.2, 0]}>
         <meshStandardMaterial color="#d0d0d0" metalness={0.9} roughness={0.15} />
       </Cylinder>
+
+      {/* BETA TEXT - SUPER BRIGHT AND VISIBLE */}
+      <group position={[0, -0.8, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        {/* B */}
+        <Box args={[0.08, 0.2, 0.03]} position={[-0.15, 0, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.06, 0.02, 0.03]} position={[-0.12, 0.08, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.06, 0.02, 0.03]} position={[-0.12, 0, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.06, 0.02, 0.03]} position={[-0.12, -0.08, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        
+        {/* E */}
+        <Box args={[0.08, 0.2, 0.03]} position={[-0.05, 0, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.06, 0.02, 0.03]} position={[-0.02, 0.08, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.04, 0.02, 0.03]} position={[-0.03, 0, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.06, 0.02, 0.03]} position={[-0.02, -0.08, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        
+        {/* T */}
+        <Box args={[0.08, 0.02, 0.03]} position={[0.05, 0.08, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.02, 0.15, 0.03]} position={[0.05, 0, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        
+        {/* A */}
+        <Box args={[0.08, 0.2, 0.03]} position={[0.15, 0, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.06, 0.02, 0.03]} position={[0.15, 0.08, 0]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.02, 0.08, 0.03]} position={[0.13, 0, 0]} rotation={[0, 0, Math.PI / 4]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+        <Box args={[0.02, 0.08, 0.03]} position={[0.17, 0, 0]} rotation={[0, 0, -Math.PI / 4]}>
+          <meshStandardMaterial 
+            color="#ffffff" 
+            emissive="#ffffff"
+            emissiveIntensity={3.0}
+            toneMapped={false}
+          />
+        </Box>
+      </group>
     </group>
   );
 }

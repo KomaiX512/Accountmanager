@@ -54,7 +54,7 @@ function AnimatedSphere({ mousePosition }: AnimatedSphereProps) {
         far={4}
       />
       
-      <Environment preset="city" />
+      {/* Environment removed to fix HDR loading error */}
     </>
   );
 }

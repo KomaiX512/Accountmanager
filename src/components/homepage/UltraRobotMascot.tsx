@@ -10,7 +10,8 @@ import {
   Html,
   MeshReflectorMaterial,
   Torus,
-  Box
+  Box,
+  Text
 } from '@react-three/drei';
 import * as THREE from 'three';
 import { useAuth } from '../../context/AuthContext';
@@ -937,6 +938,129 @@ export function StandingPlatform() {
             </Sphere>
           );
         })}
+
+        {/* 3D BETA Text on Platform - SUPER BRIGHT AND SIMPLE */}
+        <group position={[0, 0.15, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          {/* B */}
+          <Box args={[0.06, 0.15, 0.05]} position={[-0.15, 0, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.04, 0.02, 0.05]} position={[-0.13, 0.06, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.04, 0.02, 0.05]} position={[-0.13, 0, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.04, 0.02, 0.05]} position={[-0.13, -0.06, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          
+          {/* E */}
+          <Box args={[0.06, 0.15, 0.05]} position={[-0.05, 0, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.04, 0.02, 0.05]} position={[-0.03, 0.06, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.03, 0.02, 0.05]} position={[-0.035, 0, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.04, 0.02, 0.05]} position={[-0.03, -0.06, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          
+          {/* T */}
+          <Box args={[0.06, 0.02, 0.05]} position={[0.05, 0.06, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.02, 0.12, 0.05]} position={[0.05, 0, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          
+          {/* A */}
+          <Box args={[0.06, 0.15, 0.05]} position={[0.15, 0, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.04, 0.02, 0.05]} position={[0.15, 0.06, 0]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.02, 0.08, 0.05]} position={[0.13, 0, 0]} rotation={[0, 0, Math.PI / 4]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+          <Box args={[0.02, 0.08, 0.05]} position={[0.17, 0, 0]} rotation={[0, 0, -Math.PI / 4]}>
+            <meshStandardMaterial 
+              color="#ffffff" 
+              emissive="#ffffff"
+              emissiveIntensity={2.0}
+              toneMapped={false}
+            />
+          </Box>
+        </group>
       </group>
       
       {/* Static reflective floor underneath */}
@@ -1037,8 +1161,7 @@ function Scene({ isCelebrating = false }: { isCelebrating?: boolean }) {
       {/* Robot - Standing (no float) */}
       <UltraRobot isCelebrating={isCelebrating} />
 
-      {/* DARK Studio Environment */}
-      <Environment preset="night" environmentIntensity={0.3} />
+      {/* DARK Studio Environment - Removed external HDR to fix loading error */}
       
       {/* Soft shadows */}
       <ContactShadows

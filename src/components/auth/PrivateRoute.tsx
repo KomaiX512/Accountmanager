@@ -14,8 +14,10 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children }) => {
   if (loading) {
     return (
       <div className="auth-loading">
-        <div className="spinner"></div>
-        <p>Authenticating...</p>
+        <div className="logo-loading-container">
+          <img src="/Logo/logo.png" alt="Loading" className="logo-loading-image" />
+          <div className="logo-loading-ring"></div>
+        </div>
       </div>
     );
   }

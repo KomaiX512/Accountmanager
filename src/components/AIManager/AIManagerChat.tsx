@@ -36,6 +36,7 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const chatWindowRef = useRef<HTMLDivElement>(null);
 
   // Dynamically generate suggestions based on user context
   const suggestedPrompts = useMemo(() => {
@@ -492,6 +493,28 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
     }
   }, [isOpen]);
 
+  // Click outside to close chat manager
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (chatWindowRef.current && !chatWindowRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        console.log('🔒 [AI Manager] Closed by clicking outside');
+      }
+    };
+
+    // Add listener with a small delay to prevent immediate closing
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
   // Generate greeting message based on time and last visit
   useEffect(() => {
     const generateGreeting = () => {
@@ -789,16 +812,15 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
   };
 
   const clearChatHistory = () => {
-    if (confirm('Are you sure you want to delete all chat history? This cannot be undone.')) {
-      setMessages([]);
-      console.log('🗑️ [AI Manager] Chat history cleared');
-      
-      // Clear conversation memory in Gemini service
-      const service = getGeminiService();
-      if (service && currentUser?.uid) {
-        service.clearConversation();
-        console.log('🗑️ [AI Manager] Gemini conversation memory cleared');
-      }
+    // Direct deletion without confirmation popup
+    setMessages([]);
+    console.log('🗑️ [AI Manager] Chat history cleared');
+    
+    // Clear conversation memory in Gemini service
+    const service = getGeminiService();
+    if (service && currentUser?.uid) {
+      service.clearConversation();
+      console.log('🗑️ [AI Manager] Gemini conversation memory cleared');
     }
   };
 
@@ -864,6 +886,7 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
       <AnimatePresence>
         {isOpen && (
           <div
+            ref={chatWindowRef}
             className={`ai-manager-window ${isMinimized ? 'minimized' : ''}`}
             style={{ 
               position: 'fixed', 

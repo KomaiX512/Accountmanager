@@ -7,7 +7,6 @@ Allow: /sentient-ai
 Allow: /sentient-marketing
 Allow: /ai-social-media-management
 Allow: /social-media-automation
-Allow: /sentient-ai-platform
 Allow: /sentient-social-media-management
 Allow: /instagram-ai-automation
 Allow: /twitter-ai-management

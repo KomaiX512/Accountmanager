@@ -1,5 +1,13 @@
 /**
  * AI Manager Chat Styling
+ * 
+ * 🎯 FEATURES:
+ * - Draggable AI robot mascot (long-press to activate: 300ms desktop, 500ms mobile)
+ * - Edge minimization: drag to left/right edge to minimize into small circle
+ * - Minimized button shows chevron icon, click to expand
+ * - iPhone-style smooth animations with cubic-bezier curves
+ * - Mobile chat window: 70vh height (not full screen) with proper scaling
+ * - All UI elements accessible without interference from floating robot
  */
 
 /* CRITICAL: Force viewport positioning for AI Manager - Override any parent transforms */
@@ -148,16 +156,87 @@ div.ai-manager-window,
   pointer-events: auto !important;
   visibility: visible !important;
   opacity: 1 !important;
-  transform: none !important;
   width: auto !important;
   height: auto !important;
   /* CRITICAL: Force viewport positioning regardless of parent transforms */
   isolation: isolate !important;
   contain: none !important;
-  will-change: auto !important;
+  will-change: transform !important;
   backface-visibility: visible !important;
   perspective: none !important;
   transform-style: flat !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important; /* iPhone-style smooth ease-out */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+/* iPhone-style dragging state */
+.ai-manager-button-container.dragging {
+  cursor: grabbing !important;
+  transition: none !important; /* Disable transition while dragging for immediate response */
+  opacity: 0.85 !important;
+  filter: drop-shadow(0 12px 40px rgba(0, 255, 204, 0.6)) !important;
+}
+
+/* Edge minimized state - smaller button */
+.ai-manager-button-container.edge-minimized {
+  width: 48px !important;
+  height: 48px !important;
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important; /* Bouncy spring effect */
+}
+
+/* Minimized edge button - circular with chevron */
+.ai-manager-edge-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00ffcc 0%, #00ccff 100%);
+  box-shadow: 0 8px 32px rgba(0, 255, 204, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.ai-manager-edge-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.3), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ai-manager-edge-button:hover::before {
+  opacity: 1;
+}
+
+.ai-manager-edge-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 48px rgba(0, 255, 204, 0.7);
+}
+
+.ai-manager-edge-button:active {
+  transform: scale(0.95);
+  box-shadow: 0 4px 16px rgba(0, 255, 204, 0.4);
+}
+
+.edge-button-icon {
+  color: #0a0f1e;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.ai-manager-edge-button:hover .edge-button-icon {
+  transform: scale(1.15);
 }
 
 /* Debug indicator removed - AI Manager is now working correctly */
@@ -867,21 +946,37 @@ div.ai-manager-window,
     height: 56px;
   }
 
-  /* Chat window mobile - full screen */
+  /* 🎯 Chat window mobile - SMALLER & PROPERLY SCALED */
   .ai-manager-window {
     position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    height: 100vh !important;
-    border-radius: 0 !important;
+    bottom: 16px !important;
+    left: 16px !important;
+    right: 16px !important;
+    top: auto !important;
+    width: calc(100% - 32px) !important;
+    height: 70vh !important; /* 70% of viewport height instead of full screen */
+    max-height: 600px !important;
+    min-height: 400px !important;
+    border-radius: 24px !important;
     margin: 0 !important;
-    transform: translateZ(0) !important;
+    transform: translateZ(0) scale(1) !important;
+    transform-origin: bottom center !important;
     isolation: isolate !important;
     contain: none !important;
     z-index: 2147483647 !important;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+    animation: mobileSlideUp 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards !important;
+  }
+
+  @keyframes mobileSlideUp {
+    from {
+      opacity: 0;
+      transform: translateZ(0) scale(0.9) translateY(50px);
+    }
+    to {
+      opacity: 1;
+      transform: translateZ(0) scale(1) translateY(0);
+    }
   }
 
   /* Minimized state mobile */
@@ -1140,7 +1235,8 @@ div.ai-manager-window,
 /* Landscape mobile orientation */
 @media (max-width: 767px) and (orientation: landscape) {
   .ai-manager-window {
-    height: 100vh !important;
+    height: 85vh !important;
+    max-height: 500px !important;
   }
 
   .ai-manager-suggestions {
@@ -1149,5 +1245,44 @@ div.ai-manager-window,
 
   .suggestions-grid {
     max-height: 80px;
+  }
+}
+
+/* 🎯 ENHANCED MOBILE DRAGGING - Ensure robot doesn't interfere with buttons beneath */
+@media (max-width: 767px) {
+  .ai-manager-button-container.edge-minimized {
+    width: 48px !important;
+    height: 48px !important;
+  }
+  
+  .ai-manager-edge-button {
+    width: 48px;
+    height: 48px;
+  }
+  
+  /* Dragging visual feedback on mobile */
+  .ai-manager-button-container.dragging {
+    opacity: 0.9 !important;
+    transform: scale(1.05) !important;
+    filter: drop-shadow(0 16px 48px rgba(0, 255, 204, 0.8)) !important;
+  }
+  
+  /* Ensure greeting bubble doesn't show while dragging or minimized */
+  .ai-manager-button-container.dragging .ai-manager-greeting-bubble,
+  .ai-manager-button-container.edge-minimized .ai-manager-greeting-bubble {
+    display: none !important;
+  }
+}
+
+/* Very small mobile screens - ensure proper sizing */
+@media (max-width: 375px) {
+  .ai-manager-window {
+    height: 65vh !important;
+    max-height: 500px !important;
+    min-height: 350px !important;
+    bottom: 12px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: calc(100% - 24px) !important;
   }
 }

@@ -3,7 +3,7 @@
  * Universal floating chatbot accessible from anywhere
  */
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader, Bot } from 'lucide-react';
@@ -33,6 +33,15 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
   const [greetingMessage, setGreetingMessage] = useState('');
   const [robotName, setRobotName] = useState<string>('AI Manager');
   const [showSuggestions, setShowSuggestions] = useState(true);
+  
+  // 🎯 DRAGGABLE & MINIMIZABLE STATE
+  const [position, setPosition] = useState({ x: 30, y: 30 }); // Bottom-left by default
+  const [isDragging, setIsDragging] = useState(false);
+  const [isEdgeMinimized, setIsEdgeMinimized] = useState(false);
+  const [edgeSide, setEdgeSide] = useState<'left' | 'right' | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number; startX: number; startY: number } | null>(null);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const robotContainerRef = useRef<HTMLDivElement>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -493,6 +502,144 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
     }
   }, [isOpen]);
 
+  // 🎯 DRAGGING LOGIC - iPhone-style smooth dragging
+  const handleDragStart = useCallback((clientX: number, clientY: number) => {
+    if (isOpen || isEdgeMinimized) return; // Don't drag when chat is open or minimized to edge
+    
+    dragStartRef.current = {
+      x: clientX,
+      y: clientY,
+      startX: position.x,
+      startY: position.y
+    };
+  }, [isOpen, isEdgeMinimized, position]);
+
+  const handleDragMove = useCallback((clientX: number, clientY: number) => {
+    if (!dragStartRef.current || !isDragging) return;
+
+    const deltaX = clientX - dragStartRef.current.x;
+    const deltaY = clientY - dragStartRef.current.y;
+    
+    const newX = dragStartRef.current.startX + deltaX;
+    const newY = dragStartRef.current.startY + deltaY;
+    
+    // Keep within viewport bounds
+    const maxX = window.innerWidth - 80;
+    const maxY = window.innerHeight - 80;
+    
+    setPosition({
+      x: Math.max(20, Math.min(newX, maxX)),
+      y: Math.max(20, Math.min(newY, maxY))
+    });
+  }, [isDragging]);
+
+  const handleDragEnd = useCallback((clientX: number, clientY: number) => {
+    if (!dragStartRef.current) return;
+    
+    const deltaX = clientX - dragStartRef.current.x;
+    const deltaY = clientY - dragStartRef.current.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    
+    // If dragged, check for edge snap
+    if (isDragging && distance > 10) {
+      const screenWidth = window.innerWidth;
+      const snapThreshold = 100; // Distance from edge to trigger snap
+      
+      // Check if near left or right edge
+      if (position.x < snapThreshold) {
+        // Snap to left edge and minimize
+        setIsEdgeMinimized(true);
+        setEdgeSide('left');
+        setPosition({ x: -30, y: position.y }); // Hide partially off-screen
+      } else if (position.x > screenWidth - snapThreshold) {
+        // Snap to right edge and minimize
+        setIsEdgeMinimized(true);
+        setEdgeSide('right');
+        setPosition({ x: screenWidth - 50, y: position.y });
+      }
+    }
+    
+    setIsDragging(false);
+    dragStartRef.current = null;
+    
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, [isDragging, position]);
+
+  // Mouse events
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Long press to enable dragging
+    longPressTimerRef.current = setTimeout(() => {
+      setIsDragging(true);
+      handleDragStart(e.clientX, e.clientY);
+    }, 300); // 300ms long press
+  }, [handleDragStart]);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    handleDragMove(e.clientX, e.clientY);
+  }, [handleDragMove]);
+
+  const handleMouseUp = useCallback((e: MouseEvent) => {
+    handleDragEnd(e.clientX, e.clientY);
+  }, [handleDragEnd]);
+
+  // Touch events for mobile
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    
+    // Long press to enable dragging
+    longPressTimerRef.current = setTimeout(() => {
+      setIsDragging(true);
+      handleDragStart(touch.clientX, touch.clientY);
+    }, 500); // 500ms long press on mobile
+  }, [handleDragStart]);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (isDragging) {
+      e.preventDefault(); // Prevent scrolling while dragging
+      const touch = e.touches[0];
+      handleDragMove(touch.clientX, touch.clientY);
+    }
+  }, [isDragging, handleDragMove]);
+
+  const handleTouchEnd = useCallback((e: TouchEvent) => {
+    const touch = e.changedTouches[0];
+    handleDragEnd(touch.clientX, touch.clientY);
+  }, [handleDragEnd]);
+
+  // Attach global event listeners for dragging
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleTouchMove, { passive: false });
+      document.addEventListener('touchend', handleTouchEnd);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+
+  // Handle expanding from minimized edge state
+  const handleExpandFromEdge = useCallback(() => {
+    if (!isEdgeMinimized) return;
+    
+    setIsEdgeMinimized(false);
+    
+    // Move back to center area from edge
+    const newX = edgeSide === 'left' ? 30 : window.innerWidth - 110;
+    setPosition({ x: newX, y: position.y });
+    setEdgeSide(null);
+  }, [isEdgeMinimized, edgeSide, position.y]);
+
   // Click outside to close chat manager
   useEffect(() => {
     if (!isOpen) return;
@@ -845,39 +992,83 @@ export const AIManagerChat: React.FC<AIManagerChatProps> = ({ initialContext }) 
       {/* Proactive AI Manager Notification */}
       <AIManagerNotification onOpenChat={() => setIsOpen(true)} />
       
-      {/* Floating Toggle Button */}
+      {/* Floating Toggle Button - Draggable & Edge-Minimizable */}
       <AnimatePresence>
         {!isOpen && (
           <motion.div
-            className="ai-manager-button-container"
+            ref={robotContainerRef}
+            className={`ai-manager-button-container ${isDragging ? 'dragging' : ''} ${isEdgeMinimized ? 'edge-minimized' : ''}`}
             initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+            animate={{ 
+              scale: 1, 
+              opacity: 1,
+              x: position.x,
+              y: position.y
+            }}
             exit={{ scale: 0, opacity: 0 }}
-            style={{ position: 'fixed', bottom: '30px', left: '30px', zIndex: 999999 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            style={{ 
+              position: 'fixed', 
+              bottom: '0px',
+              left: '0px',
+              zIndex: 999999,
+              cursor: isDragging ? 'grabbing' : 'grab',
+              willChange: 'transform'
+            }}
+            onMouseDown={handleMouseDown}
+            onTouchStart={handleTouchStart}
           >
-            {/* 3D AI Robot Mascot */}
-            <AIManagerRobot
-              onHover={setShowGreeting}
-              onClick={() => setIsOpen(true)}
-            />
-            
-            {/* Greeting Bubble */}
-            <AnimatePresence>
-              {showGreeting && greetingMessage && (
-                <motion.div
-                  className="ai-manager-greeting-bubble"
-                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
-                  transition={{ type: 'spring', damping: 20 }}
+            {isEdgeMinimized ? (
+              /* Minimized Circle Button */
+              <motion.div
+                className="ai-manager-edge-button"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', damping: 20 }}
+                onClick={handleExpandFromEdge}
+              >
+                <motion.div 
+                  className="edge-button-icon"
+                  animate={{ rotate: edgeSide === 'left' ? 0 : 180 }}
                 >
-                  <div className="greeting-text typing-animation">
-                    {greetingMessage}
-                  </div>
-                  <div className="greeting-arrow" />
+                  <i className="fas fa-chevron-right" />
                 </motion.div>
-              )}
-            </AnimatePresence>
+              </motion.div>
+            ) : (
+              /* Full 3D AI Robot Mascot */
+              <>
+                <AIManagerRobot
+                  onHover={setShowGreeting}
+                  onClick={() => !isDragging && setIsOpen(true)}
+                />
+                
+                {/* Greeting Bubble */}
+                <AnimatePresence>
+                  {showGreeting && greetingMessage && !isDragging && (
+                    <motion.div
+                      className="ai-manager-greeting-bubble"
+                      initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                      transition={{ type: 'spring', damping: 20 }}
+                      style={{
+                        left: edgeSide === 'right' ? 'auto' : '100px',
+                        right: edgeSide === 'right' ? '100px' : 'auto'
+                      }}
+                    >
+                      <div className="greeting-text typing-animation">
+                        {greetingMessage}
+                      </div>
+                      <div className="greeting-arrow" style={{
+                        left: edgeSide === 'right' ? 'auto' : '-8px',
+                        right: edgeSide === 'right' ? '-8px' : 'auto',
+                        transform: edgeSide === 'right' ? 'rotate(180deg)' : 'none'
+                      }} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

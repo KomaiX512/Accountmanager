@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { signInWithGoogle, signInWithEmailPassword, registerWithEmailPassword, resetPassword, sendVerificationEmail, checkEmailVerified, logoutUser, auth } from '../firebase/config';
 import { clearInstagramConnection, disconnectInstagramAccount } from '../utils/instagramSessionManager';
+import { isBypassActive } from '../utils/bypassChecker';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -219,7 +220,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ✅ CROSS-DEVICE LOADING STATE VALIDATION - Core authentication-level protection
   const checkLoadingStateForPlatform = async (platform: string): Promise<{ hasLoadingState: boolean; redirectTo?: string; remainingMinutes?: number }> => {
-    if (!currentUser?.uid) {
+    const uid = currentUser?.uid || localStorage.getItem('currentUserId') || '';
+    if (!uid) {
       return { hasLoadingState: false };
     }
 
@@ -229,10 +231,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
+      // 🚀 BYPASS CHECK: If Access Dashboard is active, NEVER treat as loading
+      if (isBypassActive(platform, uid)) {
+        return { hasLoadingState: false };
+      }
       console.log(`[AUTH GUARD] 🔍 Checking loading state for ${platform} (user: ${currentUser.uid})`);
 
       // Step 1: Check backend processing status first (source of truth)
-      const backendResponse = await fetch(`/api/processing-status/${currentUser.uid}?platform=${platform}`);
+      const backendResponse = await fetch(`/api/processing-status/${uid}?platform=${platform}`);
       if (backendResponse.ok) {
         const backendData = await backendResponse.json();
         const processingData = backendData?.data;
@@ -265,7 +271,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.log(`[AUTH GUARD] ✅ Backend loading state expired for ${platform}, clearing`);
             // Clear expired backend state
             try {
-              await fetch(`/api/processing-status/${currentUser.uid}`, {
+              await fetch(`/api/processing-status/${uid}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ platform })
@@ -294,7 +300,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Persist local state to backend for cross-device sync
             try {
-              await fetch(`/api/processing-status/${currentUser.uid}`, {
+              await fetch(`/api/processing-status/${uid}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -352,16 +358,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ✅ SYNC PROCESSING STATUS FROM BACKEND - Force synchronization of all platform states
   const syncProcessingStatusFromBackend = async (): Promise<void> => {
-    if (!currentUser?.uid) return;
+    const uid = currentUser?.uid || localStorage.getItem('currentUserId') || '';
+    if (!uid) return;
 
     try {
-      console.log(`[AUTH SYNC] 🔄 Syncing all processing statuses from backend for user ${currentUser.uid}`);
+      console.log(`[AUTH SYNC] 🔄 Syncing all processing statuses from backend for user ${uid}`);
       
       // Add timeout and better error handling for the fetch
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
       
-      const response = await fetch(`/api/processing-status/${currentUser.uid}`, {
+      const response = await fetch(`/api/processing-status/${uid}`, {
         signal: controller.signal,
         cache: 'no-cache'
       });
@@ -379,6 +386,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const now = Date.now();
 
       for (const platform of platforms) {
+        // 🚀 BYPASS CHECK: Skip syncing a platform that is intentionally bypassed
+        if (isBypassActive(platform, uid)) {
+          continue;
+        }
         const state = processingStates[platform];
         
         if (state && typeof state.endTime === 'number') {

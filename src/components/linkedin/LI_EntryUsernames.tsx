@@ -1,5 +1,6 @@
 import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { createPortal } from 'react-dom';
 import './LI_EntryUsernames.css'; // Use LinkedIn-specific CSS
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
@@ -45,6 +46,22 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
   
   const { currentUser } = useAuth();
   const { startProcessing, processingState } = useProcessing();
+
+  // Lock background scroll when modal is open for proper viewport centering
+  useEffect(() => {
+    const root = document.documentElement;
+    if (showConfirmation) {
+      root.classList.add('modal-open');
+      document.body.classList.add('modal-open');
+    } else {
+      root.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      root.classList.remove('modal-open');
+      document.body.classList.remove('modal-open');
+    };
+  }, [showConfirmation]);
 
   // LinkedIn-specific endpoints
   const usernameCheckUrl = '/api/check-username-availability';
@@ -867,44 +884,47 @@ const LI_EntryUsernames: React.FC<LI_EntryUsernamesProps> = ({
         </form>
       </div>
 
-      {/* Confirmation Modal */}
-      {showConfirmation && confirmationData && (
-        <div className="modal-overlay">
-          <div className="confirmation-modal">
-            <h3>Confirm Your LinkedIn Setup</h3>
-            <div className="confirmation-details">
-              <p><strong>Username:</strong> {confirmationData.accountData?.name || confirmationData.username}</p>
-              <p><strong>URL:</strong> {confirmationData.accountData?.url}</p>
-              <p><strong>Account Type:</strong> {confirmationData.accountType === 'professional' ? 'Professional Account' : 'Personal Account'}</p>
-              <p><strong>Professional Focus:</strong> {confirmationData.postingStyle}</p>
-              <p><strong>Competitors ({confirmationData.competitor_data?.length || 0}):</strong></p>
-              <ul>
-                {(confirmationData.competitor_data || []).map((comp: { name: string; url: string }, index: number) => (
-                  <li key={index}><strong>{comp.name}</strong> — {comp.url}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="confirmation-warning">
-              <p><strong>⚠️ Important:</strong> This will start a 15-minute AI analysis process. Make sure all information is correct.</p>
-            </div>
-            <div className="confirmation-actions">
-              <button 
-                onClick={handleConfirmedSubmission}
-                className="confirm-btn"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Starting Analysis...' : 'Confirm & Start Analysis'}
-              </button>
-              <button 
-                onClick={() => setShowConfirmation(false)}
-                className="cancel-btn"
-                disabled={isLoading}
-              >
-                Cancel
-              </button>
+      {/* Confirmation Modal (ported to document.body for a true full-screen overlay) */}
+      {showConfirmation && confirmationData && createPortal(
+        (
+          <div className="modal-overlay li-modal-overlay">
+            <div className="confirmation-modal">
+              <h3>Confirm Your LinkedIn Setup</h3>
+              <div className="confirmation-details">
+                <p><strong>Username:</strong> {confirmationData.accountData?.name || confirmationData.username}</p>
+                <p><strong>URL:</strong> {confirmationData.accountData?.url}</p>
+                <p><strong>Account Type:</strong> {confirmationData.accountType === 'professional' ? 'Professional Account' : 'Personal Account'}</p>
+                <p><strong>Professional Focus:</strong> {confirmationData.postingStyle}</p>
+                <p><strong>Competitors ({confirmationData.competitor_data?.length || 0}):</strong></p>
+                <ul>
+                  {(confirmationData.competitor_data || []).map((comp: { name: string; url: string }, index: number) => (
+                    <li key={index}><strong>{comp.name}</strong> — {comp.url}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="confirmation-warning">
+                <p><strong>⚠️ Important:</strong> This will start a 15-minute AI analysis process. Make sure all information is correct.</p>
+              </div>
+              <div className="confirmation-actions">
+                <button 
+                  onClick={handleConfirmedSubmission}
+                  className="confirm-btn"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Starting Analysis...' : 'Confirm & Start Analysis'}
+                </button>
+                <button 
+                  onClick={() => setShowConfirmation(false)}
+                  className="cancel-btn"
+                  disabled={isLoading}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ),
+        document.body
       )}
     </motion.div>
   );

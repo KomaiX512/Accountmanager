@@ -49,7 +49,8 @@ rootElement.style.willChange = 'transform';
 // Raw /src/* paths don't exist in production builds and cause 404/MIME errors.
 // Use Vite's compile-time flag so this block is tree-shaken in production builds.
 // Skip preloading for ngrok to avoid overwhelming free tier with too many requests
-if (import.meta.env.DEV && !window.location.hostname.includes('ngrok')) {
+// Restrict dev-only modulepreload to localhost to avoid production 404/MIME errors
+if (import.meta.env.DEV && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
   const criticalResources = [
     '/src/components/dashboard/PlatformDashboard.tsx',
     '/src/components/instagram/Dashboard.css',

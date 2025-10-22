@@ -1,4 +1,5 @@
 import React, { useState, ChangeEvent, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import '../facebook/FB_EntryUsernames.css'; // Use Facebook CSS for proper modal centering
 import { motion } from 'framer-motion';
@@ -706,73 +707,76 @@ const usernameCheckUrl = '/api/check-username-availability';
         </form>
       </div>
 
-      {/* Pre-submission Confirmation Modal */}
-      {showConfirmation && confirmationData && (
-        <motion.div
-          className="confirmation-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
+      {/* Pre-submission Confirmation Modal (ported to document.body to avoid transform/scroll containment) */}
+      {showConfirmation && confirmationData && createPortal(
+        (
           <motion.div
-            className="confirmation-modal"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.8, opacity: 0 }}
+            className="confirmation-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
           >
-            <div className="confirmation-header">
-              <h3>🔍 Final Review Required</h3>
-              <p><strong>Please verify your information before starting the 2-minute AI analysis:</strong></p>
-            </div>
-            
-            <div className="confirmation-content">
-              <div className="confirmation-section">
-                <h4>📝 Your Information</h4>
-                <div className="confirmation-item">
-                  <strong>Username:</strong> {confirmationData.username}
-                  <div className="critical-warning">⚠️ This is critical - check spelling carefully!</div>
-                </div>
-                <div className="confirmation-item">
-                  <strong>Account Type:</strong> {confirmationData.accountType}
-                </div>
-                <div className="confirmation-item">
-                  <strong>Posting Style:</strong> {confirmationData.postingStyle}
-                </div>
+            <motion.div
+              className="confirmation-modal"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+            >
+              <div className="confirmation-header">
+                <h3>🔍 Final Review Required</h3>
+                <p><strong>Please verify your information before starting the 2-minute AI analysis:</strong></p>
               </div>
               
-              <div className="confirmation-section">
-                <h4>🎯 Competitors ({confirmationData.competitors.length})</h4>
-                {confirmationData.competitors.map((comp: string, index: number) => (
-                  <div key={index} className="confirmation-item">
-                    <strong>Competitor {index + 1}:</strong> {comp}
+              <div className="confirmation-content">
+                <div className="confirmation-section">
+                  <h4>📝 Your Information</h4>
+                  <div className="confirmation-item">
+                    <strong>Username:</strong> {confirmationData.username}
+                    <div className="critical-warning">⚠️ This is critical - check spelling carefully!</div>
                   </div>
-                ))}
+                  <div className="confirmation-item">
+                    <strong>Account Type:</strong> {confirmationData.accountType}
+                  </div>
+                  <div className="confirmation-item">
+                    <strong>Posting Style:</strong> {confirmationData.postingStyle}
+                  </div>
+                </div>
+                
+                <div className="confirmation-section">
+                  <h4>🎯 Competitors ({confirmationData.competitors.length})</h4>
+                  {confirmationData.competitors.map((comp: string, index: number) => (
+                    <div key={index} className="confirmation-item">
+                      <strong>Competitor {index + 1}:</strong> {comp}
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="confirmation-warning">
+                  <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 2-minute AI analysis process. Make sure all information is correct!</p>
+                </div>
               </div>
               
-              <div className="confirmation-warning">
-                <p><strong>⚠️ Important:</strong> Once submitted, this will initiate a 2-minute AI analysis process. Make sure all information is correct!</p>
+              <div className="confirmation-actions">
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmation(false)}
+                  className="cancel-button"
+                >
+                  Go Back & Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmedSubmission}
+                  className="confirm-button"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Processing...' : '✅ Confirm & Start Analysis'}
+                </button>
               </div>
-            </div>
-            
-            <div className="confirmation-actions">
-              <button
-                type="button"
-                onClick={() => setShowConfirmation(false)}
-                className="cancel-button"
-              >
-                Go Back & Edit
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmedSubmission}
-                className="confirm-button"
-                disabled={isLoading}
-              >
-                {isLoading ? 'Processing...' : '✅ Confirm & Start Analysis'}
-              </button>
-            </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
+        ),
+        document.body
       )}
     </motion.div>
   );

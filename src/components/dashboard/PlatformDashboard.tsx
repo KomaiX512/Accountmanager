@@ -49,6 +49,7 @@ import AutopilotPopup from '../common/AutopilotPopup';
 import ProfilePopup from '../common/ProfilePopup';
 import ManualGuidance from '../common/ManualGuidance';
 import { appendBypassParam } from '../../utils/cacheManager';
+import { isBypassActive } from '../../utils/bypassChecker';
 
 // Define RagService compatible ChatMessage
 interface RagChatMessage {
@@ -1548,10 +1549,12 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
   }, [platform, accountHolder, navigate]);
 
   useEffect(() => {
-    if (processingState.isProcessing && processingState.platform === platform) {
+    const uid = currentUser?.uid || localStorage.getItem('currentUserId') || '';
+    const bypass = uid ? isBypassActive(platform, uid) : false;
+    if (processingState.isProcessing && processingState.platform === platform && !bypass) {
       navigate(`/processing/${platform}`, { replace: true });
     }
-  }, [processingState, navigate, platform]);
+  }, [processingState, navigate, platform, currentUser?.uid]);
 
   // Check guard after all hooks are called
   if (guard.active) {

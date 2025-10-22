@@ -87,12 +87,14 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
 
   // Backend first validation (single source of truth)
   const backendValidate = async (platform: string) => {
-    if (!currentUser?.uid) return { ok: false } as const;
+    // Use auth UID if available, otherwise fall back to localStorage (set during bypass)
+    const uid = currentUser?.uid || localStorage.getItem('currentUserId') || '';
+    if (!uid) return { ok: false } as const;
     try {
       // Check if bypass is active
-      const bypassActive = isBypassActive(platform, currentUser.uid);
+      const bypassActive = isBypassActive(platform, uid);
       
-      const res = await fetch(`/api/validate-dashboard-access/${currentUser.uid}`, {
+      const res = await fetch(`/api/validate-dashboard-access/${uid}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ platform, bypassActive })
@@ -111,9 +113,10 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
     
     const now = Date.now();
     const platform = getCurrentPlatform();
+    const uid = currentUser?.uid || localStorage.getItem('currentUserId') || '';
     
     // 🚀 ULTRA-CRITICAL: BYPASS CHECK FIRST - If bypass active, STOP ALL VALIDATION IMMEDIATELY
-    if (platform && currentUser?.uid && isBypassActive(platform, currentUser.uid)) {
+    if (platform && uid && isBypassActive(platform, uid)) {
       // 🔒 Respect user bypass: do not clear bypass here. It will be cleaned up
       // when processing completes naturally (ProcessingLoadingState) or when
       // the bypass timer expires (TopBar cleanup). Skip all validation.
@@ -129,13 +132,13 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
     
     inFlightRef.current = true;
     try {
-      if (!currentUser?.uid || !isProtectedRoute()) return;
+      if (!uid || !isProtectedRoute()) return;
       
       // ✅ ENHANCED GLOBAL PROCESSING VALIDATION - More aggressive checking
-      if (currentUser?.uid) {
+      if (uid) {
         try {
           // ✅ OPTIMIZED LOGGING: Only log when there are active processing states
-          const globalResp = await fetch(`/api/processing-status/${currentUser.uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+          const globalResp = await fetch(`/api/processing-status/${uid}?ts=${Date.now()}`, { cache: 'no-store', headers: { 'Accept': 'application/json' } });
           if (globalResp.ok) {
             const globalJson = await globalResp.json();
             const states = globalJson?.data || {};
@@ -205,19 +208,19 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
       }
 
       // ✅ ENHANCED PLATFORM ACCESS CHECK: Check if platform is now claimed after completion
-      if (platform && currentUser?.uid) {
+      if (platform && uid) {
         try {
           // ✅ CRITICAL FIX: Use the SAME endpoints as App.tsx for consistency
           // This prevents the cross-device sync mismatch where LoadingStateGuard and App.tsx use different data sources
           let endpoint = '';
           if (platform === 'instagram') {
-            endpoint = `/api/user-instagram-status/${currentUser.uid}`;
+            endpoint = `/api/user-instagram-status/${uid}`;
           } else if (platform === 'twitter') {
-            endpoint = `/api/user-twitter-status/${currentUser.uid}`;
+            endpoint = `/api/user-twitter-status/${uid}`;
           } else if (platform === 'facebook') {
-            endpoint = `/api/user-facebook-status/${currentUser.uid}`;
+            endpoint = `/api/user-facebook-status/${uid}`;
           } else {
-            endpoint = `/api/platform-access/${currentUser.uid}`;
+            endpoint = `/api/platform-access/${uid}`;
           }
           
           const tsEndpoint = `${endpoint}${endpoint.includes('?') ? '&' : '?'}ts=${Date.now()}`;
@@ -240,7 +243,7 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
             
             if (isClaimed) {
               // Platform is claimed on backend - check if we need to update localStorage
-              const localAccessKey = `${platform}_accessed_${currentUser.uid}`;
+              const localAccessKey = `${platform}_accessed_${uid}`;
               const localClaimed = localStorage.getItem(localAccessKey) === 'true';
               
               if (!localClaimed) {
@@ -259,13 +262,13 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
                   }
                   
                   if (username && username.trim()) {
-                    localStorage.setItem(`${platform}_username_${currentUser.uid}`, username.trim());
+                    localStorage.setItem(`${platform}_username_${uid}`, username.trim());
                     console.log(`🔍 BACKGROUND VALIDATION: Username ${username} synced to localStorage for ${platform}`);
                   }
                   
                   // Get account type if available
                   if (accessData.accountType) {
-                    localStorage.setItem(`${platform}_account_type_${currentUser.uid}`, accessData.accountType);
+                    localStorage.setItem(`${platform}_account_type_${uid}`, accessData.accountType);
                     console.log(`🔍 BACKGROUND VALIDATION: Account type ${accessData.accountType} synced to localStorage for ${platform}`);
                   }
                 } catch (error) {
@@ -414,8 +417,6 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
 
   // ✅ BACKGROUND VALIDATION: Run validation in background without blocking UI
   useEffect(() => {
-    if (!currentUser?.uid) return;
-    
     // ✅ IMMEDIATE BACKGROUND CHECK: Run validation immediately but in background
     backgroundCheck();
     
@@ -491,7 +492,8 @@ const LoadingStateGuard: React.FC<LoadingStateGuardProps> = ({ children }) => {
   // ✅ ENHANCED VISIBILITY CHANGE HANDLING: Check when tab becomes visible
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (!document.hidden && currentUser?.uid && isProtectedRoute()) {
+      const uid = currentUser?.uid || localStorage.getItem('currentUserId');
+      if (!document.hidden && uid && isProtectedRoute()) {
         console.log(`🔍 VISIBILITY CHANGE: Tab became visible, running background validation`);
         // Small delay to ensure any background sync has completed
         setTimeout(() => backgroundCheck(), 800); // ✅ OPTIMIZED: Increased from 500ms to 800ms

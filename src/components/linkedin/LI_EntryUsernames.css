@@ -443,6 +443,17 @@
   padding: 20px;
 }
 
+/* Ensure LinkedIn modal overlay uses dynamic viewport height for perfect centering on mobile */
+.li-modal-overlay {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  width: 100vw !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 .confirmation-modal {
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(15px);

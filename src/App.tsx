@@ -256,13 +256,6 @@ const AppContent: React.FC = () => {
           }
         }
         
-        // If still no username, set a known good default for Facebook
-        if (!username) {
-          const defaultFacebookUsername = 'AutoPulseGlobalTrading';
-          console.log(`[App.tsx] 🔧 SETTING DEFAULT Facebook username: "${defaultFacebookUsername}"`);
-          localStorage.setItem(`${currentUrlPlatform}_username_${currentUser.uid}`, defaultFacebookUsername);
-          username = defaultFacebookUsername;
-        }
       }
     }
 
@@ -873,7 +866,10 @@ const AppContent: React.FC = () => {
               
               // ✅ CRITICAL FIX: If we have any indication the platform was accessed, proceed to dashboard
               // This prevents the cross-device sync issue where Device B shows entry form
-              if (hasAccessed || (cachedUsername && cachedUsername.trim())) {
+              const proceedUsingCache = platformKey === 'facebook'
+                ? (hasAccessed && cachedUsername && cachedUsername.trim())
+                : (hasAccessed || (cachedUsername && cachedUsername.trim()));
+              if (proceedUsingCache) {
                 console.log(`[App] ⚠️ Backend reported not set up for ${platformKey}, but local cache indicates setup completed – proceeding to dashboard using cache.`);
                 
                 // ✅ CRITICAL FIX: Ensure the accessed flag is set for future cross-device sync
@@ -958,7 +954,10 @@ const AppContent: React.FC = () => {
             
             // ✅ CRITICAL FIX: If we have any indication the platform was accessed, proceed to dashboard
             // This prevents the cross-device sync issue where Device B shows entry form
-            if (hasAccessed || (cachedUsername && cachedUsername.trim())) {
+            const proceedUsingCacheOnError = platformKey === 'facebook'
+              ? (hasAccessed && cachedUsername && cachedUsername.trim())
+              : (hasAccessed || (cachedUsername && cachedUsername.trim()));
+            if (proceedUsingCacheOnError) {
               console.log(`[App] 🌐 Using cached ${platformKey} setup to continue despite status error`);
               
               // ✅ CRITICAL FIX: Ensure the accessed flag is set for future cross-device sync

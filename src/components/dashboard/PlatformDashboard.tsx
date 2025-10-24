@@ -97,10 +97,11 @@ const PlatformDashboard: React.FC<PlatformDashboardProps> = memo(({
   const accountHolder = localUsername; // 🚫 Never fallback to prop to avoid cross-platform contamination
 
   console.log(`[PlatformDashboard] 🔄 Platform=${platform}, Username=${accountHolder || '(none)'}`);
-  
-  // Early return if no username found for this platform
-  if (!accountHolder) {
-    console.log(`[PlatformDashboard] ⚠️ No username found for ${platform}, redirecting to entry form`);
+  const uidForAccess = currentUser?.uid;
+  const hasAccessed = uidForAccess ? localStorage.getItem(`${platform}_accessed_${uidForAccess}`) === 'true' : false;
+
+  if (!accountHolder || (platform === 'facebook' && !hasAccessed)) {
+    console.log(`[PlatformDashboard] ⚠️ Access denied for ${platform}: username=${!!accountHolder}, accessed=${hasAccessed}. Redirecting to entry form`);
     navigate(`/${platform}`);
     return null;
   }

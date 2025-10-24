@@ -8725,24 +8725,41 @@ app.get(['/profile-info/:platform/:username', '/api/profile-info/:platform/:user
       console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Reading from cache: ${profileFilePath}`);
       profileData = JSON.parse(fs.readFileSync(profileFilePath, 'utf-8'));
     } else {
-      // Fallback to R2 bucket
+      // Fallback to R2 bucket with intelligent key pattern matching
       console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Cache miss, trying R2 for ${username}`);
       
-      try {
-        const r2Key = `${platform}/${username}/profile.json`;
-        const getCommand = new GetObjectCommand({
-          Bucket: 'tasks',
-          Key: r2Key,
-        });
-        const r2Response = await s3Client.send(getCommand);
-        const r2Body = await streamToString(r2Response.Body);
-        
-        if (r2Body && r2Body.trim()) {
-          profileData = JSON.parse(r2Body);
-          console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Profile loaded from R2: ${r2Key}`);
+      // Try multiple R2 key patterns in order of likelihood
+      const keyPatterns = [
+        `ProfileInfo/${platform}/${username}/${username}.json`,  // Standard schema
+        `AccountInfo/${platform}/${username}/info.json`,         // Account info schema
+        `${platform}/${username}/profile.json`,                  // Legacy pattern
+        `ProfileInfo/${platform}/${username}.json`,              // Flat profile schema
+      ];
+      
+      for (const r2Key of keyPatterns) {
+        try {
+          console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Trying R2 key: ${r2Key}`);
+          
+          const getCommand = new GetObjectCommand({
+            Bucket: 'tasks',
+            Key: r2Key,
+          });
+          const r2Response = await s3Client.send(getCommand);
+          const r2Body = await streamToString(r2Response.Body);
+          
+          if (r2Body && r2Body.trim()) {
+            profileData = JSON.parse(r2Body);
+            console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] ✅ Profile loaded from R2: ${r2Key}`);
+            break; // Found it, stop trying other patterns
+          }
+        } catch (r2Error) {
+          // Key not found, try next pattern
+          if (r2Error.name === 'NoSuchKey' || r2Error.message.includes('does not exist')) {
+            console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] Key not found: ${r2Key}`);
+          } else {
+            console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] R2 error for ${r2Key}:`, r2Error.message);
+          }
         }
-      } catch (r2Error) {
-        console.log(`[${new Date().toISOString()}] [API-PROFILE-INFO] R2 fetch failed:`, r2Error.message);
       }
     }
     
